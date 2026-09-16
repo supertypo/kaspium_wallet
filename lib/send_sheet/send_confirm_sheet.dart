@@ -31,10 +31,14 @@ class SendConfirmSheet extends HookConsumerWidget {
   final SendTx sendTx;
   final bool rbf;
 
+  /// The `.k` name the user typed, shown above the address it resolved to.
+  final String? toLabel;
+
   const SendConfirmSheet({
     super.key,
     required this.sendTx,
     this.rbf = false,
+    this.toLabel,
   });
 
   @override
@@ -288,6 +292,7 @@ class SendConfirmSheet extends HookConsumerWidget {
               ),
               AddressCard(
                 address: toAddress,
+                label: toLabel,
                 onPressed: isCompoundTx && !rbf ? selectAddress : null,
               ),
               Container(
