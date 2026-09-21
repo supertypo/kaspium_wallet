@@ -10,6 +10,12 @@ import 'package:retry/retry.dart';
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
     'kaspa:qpvtxyhfm0x63y97g2ktamen5ngpdmjwpslcf92quu5x5e5ag3uezpj2gt9km';
+const kTestnetAddress =
+    'kaspatest:pq3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyxccxflal';
+const kSchnorrValue =
+    '5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa';
+const kPayee =
+    'kaspa:qp8n2k7uklxq4aegau7vawtptkgxsja4kt99lpv6krctwpq8tpc6547zhh9u4';
 
 http.Response _json(Object? body, [int status = 200]) => http.Response(
   json.encode(body),
@@ -136,6 +142,159 @@ void main() {
         wrongAddress.resolveName('kaspa'),
         throwsA(isA<FormatException>()),
       );
+    });
+  });
+
+  group('resolveName over a subname', () {
+    Map<String, Object?> parent({
+      Map<String, Object?>? records,
+      bool card = true,
+      bool decoded = true,
+      bool live = true,
+      bool covenant = false,
+      String address = kAddress,
+    }) => {
+      'name': 'alice',
+      'ownerType': covenant ? 4 : 0,
+      'owner': 'abcd',
+      if (!covenant) 'address': address,
+      'deedAddress': 'kaspa:pzdeed',
+      if (card)
+        'card': {
+          'key': 'abcd',
+          'outpointTxid': 'ffff',
+          'outpointIndex': 1,
+          'value': 100000000,
+          'spenderType': 0,
+          'spender': 'abcd',
+          'spenderAddress': address,
+          'cardAddress': 'kaspa:pzcard',
+          'recordsHash': 'eeee',
+          'blob': 'a0',
+          if (decoded) 'records': records ?? const <String, Object?>{},
+          'live': live,
+        },
+      'registryCovenantId': 'ffff',
+    };
+
+    test(
+      'reads the payee off the parent card, asking only for the parent',
+      () async {
+        final service = serviceAnswering(
+          parent(
+            records: {
+              'sub:bob': {'opaque': kSchnorrValue},
+            },
+          ),
+        );
+
+        final resolution = await service.resolveName('bob.alice');
+
+        expect(paths, ['/v1/names/alice']);
+        expect(resolution?.name, 'bob.alice');
+        expect(resolution?.display, 'bob.alice.k');
+        expect(resolution?.address, kPayee);
+      },
+    );
+
+    test(
+      'renders the payee under the prefix the parent answered with',
+      () async {
+        final service = serviceAnswering(
+          parent(
+            address: kTestnetAddress,
+            records: {
+              'sub:bob': {'opaque': kSchnorrValue},
+            },
+          ),
+        );
+
+        final resolution = await service.resolveName('bob.alice');
+
+        expect(resolution?.address, startsWith('kaspatest:'));
+      },
+    );
+
+    test('answers null for a label the card does not hold', () async {
+      final service = serviceAnswering(
+        parent(
+          records: {
+            'sub:pay': {'opaque': kSchnorrValue},
+            'primary': true,
+          },
+        ),
+      );
+
+      expect(await service.resolveName('bob.alice'), isNull);
+    });
+
+    test('answers null for a value that pays nobody', () async {
+      // A covenant id, which no reader can pay
+      final service = serviceAnswering(
+        parent(
+          records: {
+            'sub:bob': {'opaque': '582104${'11' * 32}'},
+          },
+        ),
+      );
+
+      expect(await service.resolveName('bob.alice'), isNull);
+    });
+
+    test('answers null when the parent has no card', () async {
+      final service = serviceAnswering(parent(card: false));
+
+      expect(await service.resolveName('bob.alice'), isNull);
+    });
+
+    test('answers null for a card whose blob is not a record set', () async {
+      // The indexer leaves the records out when it cannot decode the blob
+      final service = serviceAnswering(parent(decoded: false));
+
+      expect(await service.resolveName('bob.alice'), isNull);
+    });
+
+    test('answers null when a covenant owns the parent', () async {
+      final service = serviceAnswering(
+        parent(
+          covenant: true,
+          records: {
+            'sub:bob': {'opaque': kSchnorrValue},
+          },
+        ),
+      );
+
+      expect(await service.resolveName('bob.alice'), isNull);
+    });
+
+    test('throws when the card is not the live one', () async {
+      // The route serves the live card alone, so this is an indexer to ask
+      // again rather than a label that pays nobody
+      final service = serviceAnswering(
+        parent(
+          live: false,
+          records: {
+            'sub:bob': {'opaque': kSchnorrValue},
+          },
+        ),
+      );
+
+      await expectLater(
+        service.resolveName('bob.alice'),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('does not ask about an invalid label or parent', () async {
+      final service = serviceAnswering(const {});
+
+      expect(await service.resolveName('bob.-alice'), isNull);
+      // A label under the suffix segment, which would otherwise read the name
+      // `k` for every doubled-suffix typo
+      expect(await service.resolveName('bob.alice.k'), isNull);
+      expect(await service.resolveName('-bob.alice'), isNull);
+      expect(await service.resolveName('${'z' * 65}.alice'), isNull);
+      expect(paths, isEmpty);
     });
   });
 

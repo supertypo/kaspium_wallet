@@ -71,13 +71,71 @@ void main() {
     });
   });
 
+  group('tryNormalize over a subname', () {
+    test('splits the label off the parent at the last dot', () {
+      expect(DotkName.tryNormalize('bob.alice.k'), 'bob.alice');
+      expect(DotkName.tryNormalize('dev.team.alice.k'), 'dev.team.alice');
+      expect(DotkName.tryNormalize('Bob.Alice.K'), 'bob.alice');
+    });
+
+    test('a dotted input must carry the suffix', () {
+      // Every top level domain is a registrable name, so without this rule
+      // `pay.stripe.com` would pay whoever holds the name `com`
+      expect(DotkName.tryNormalize('bob.alice'), isNull);
+      expect(DotkName.tryNormalize('pay.stripe.com'), isNull);
+    });
+
+    test('the suffix is stripped once, and no segment may be it', () {
+      // The parent cannot be `k`, or the holder of the one letter name would
+      // answer every doubled-suffix typo on the registry
+      expect(DotkName.tryNormalize('alice.k.k'), isNull);
+      expect(DotkName.tryNormalize('bob.alice.k.k'), isNull);
+      // A label segment cannot be `k` either, so that this wallet resolves
+      // what every other reader resolves
+      expect(DotkName.tryNormalize('k.alice.k'), isNull);
+    });
+
+    test('the name k keeps both of its own spellings', () {
+      expect(DotkName.tryNormalize('k.k'), 'k');
+    });
+
+    test('every segment is a name of its own', () {
+      expect(DotkName.tryNormalize('a..b.k'), isNull);
+      expect(DotkName.tryNormalize('.alice.k'), isNull);
+      expect(DotkName.tryNormalize('-bob.alice.k'), isNull);
+      expect(DotkName.tryNormalize('bob.-alice.k'), isNull);
+      expect(DotkName.tryNormalize('${'a' * 33}.alice.k'), isNull);
+    });
+
+    test('the whole label holds 64 bytes with its dots', () {
+      final label = '${'z' * 32}.${'z' * 31}';
+      expect(label.length, DotkName.labelMaxLength);
+      expect(DotkName.tryNormalize('$label.alice.k'), '$label.alice');
+      expect(DotkName.tryNormalize('${label}z.alice.k'), isNull);
+    });
+  });
+
+  group('splitTarget', () {
+    test('answers the parent alone for a name', () {
+      expect(DotkName.splitTarget('alice'), ('alice', null));
+    });
+
+    test('answers the parent and the label for a subname', () {
+      expect(DotkName.splitTarget('bob.alice'), ('alice', 'bob'));
+      expect(DotkName.splitTarget('dev.team.alice'), ('alice', 'dev.team'));
+    });
+  });
+
   test('isName follows tryNormalize', () {
     expect(DotkName.isName('Kaspa.k'), isTrue);
+    expect(DotkName.isName('bob.Kaspa.k'), isTrue);
     expect(DotkName.isName('kaspa'), isFalse);
+    expect(DotkName.isName('bob.kaspa'), isFalse);
   });
 
   test('display adds the suffix', () {
     expect(DotkName.display('kaspa'), 'kaspa.k');
+    expect(DotkName.display('bob.kaspa'), 'bob.kaspa.k');
     expect(DotkName.suffix, '.k');
   });
 
