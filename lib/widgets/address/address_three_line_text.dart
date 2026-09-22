@@ -70,7 +70,8 @@ class AddressThreeLineText extends ConsumerWidget {
     return Column(
       crossAxisAlignment: textAlign == .center ? .center : .start,
       children: [
-        if (label != null) Text(label!, style: mapping[type]?.$1),
+        if (label != null)
+          Text(label!, style: mapping[type]?.$1, textAlign: textAlign),
         RichText(
           textAlign: textAlign,
           text: TextSpan(
