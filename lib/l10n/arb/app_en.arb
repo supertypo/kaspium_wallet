@@ -182,6 +182,7 @@
     }
   },
   "dotkResolving": "Resolving name…",
+  "dotkUnconfirmed": "Name could not be confirmed",
   "emailAction": "Email {email}",
   "@emailAction": {
     "placeholders": {

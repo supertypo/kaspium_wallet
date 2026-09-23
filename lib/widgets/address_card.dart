@@ -14,6 +14,7 @@ class AddressCard extends HookConsumerWidget {
 
   /// Shown instead of the contact, address or `.k` name label.
   final String? label;
+  final bool labelProven;
 
   const AddressCard({
     super.key,
@@ -22,6 +23,7 @@ class AddressCard extends HookConsumerWidget {
     this.type = .PRIMARY,
     this.onPressed,
     this.label,
+    this.labelProven = false,
   });
 
   @override
@@ -63,6 +65,7 @@ class AddressCard extends HookConsumerWidget {
       child: AddressThreeLineText(
         address: address.encoded,
         label: shownLabel,
+        labelProven: labelProven,
         type: type,
       ),
     );

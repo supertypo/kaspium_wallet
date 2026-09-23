@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaspium_wallet/dotk/dotk_subname.dart';
+import 'package:kaspium_wallet/kaspa/utils.dart';
 
 /// A payload that is a point on the curve.
 const kSchnorrPayload =
@@ -9,7 +12,7 @@ const kSchnorrPayload =
 const kFieldPrime =
     'fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f';
 
-Map<String, Object?> opaque(String hex) => {'opaque': hex};
+Uint8List opaque(String hex) => hexToBytes(hex);
 
 void main() {
   group('payee', () {
@@ -105,7 +108,6 @@ void main() {
         DotkSubname.payee(opaque('59002100$kSchnorrPayload'), .kaspa),
         isNull,
       );
-      expect(DotkSubname.payee(opaque('zz'), .kaspa), isNull);
       expect(DotkSubname.payee(opaque(''), .kaspa), isNull);
     });
 
@@ -113,7 +115,6 @@ void main() {
       expect(DotkSubname.payee('kaspa:qqq', .kaspa), isNull);
       expect(DotkSubname.payee(true, .kaspa), isNull);
       expect(DotkSubname.payee(null, .kaspa), isNull);
-      expect(DotkSubname.payee({'opaque': 42}, .kaspa), isNull);
     });
   });
 

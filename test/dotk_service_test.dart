@@ -3,19 +3,19 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:kaspium_wallet/dotk/dotk_records.dart';
 import 'package:kaspium_wallet/dotk/dotk_service.dart';
 import 'package:kaspium_wallet/kaspa/api/json_client.dart';
+import 'package:kaspium_wallet/kaspa/utils.dart';
 import 'package:retry/retry.dart';
 
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
     'kaspa:qpvtxyhfm0x63y97g2ktamen5ngpdmjwpslcf92quu5x5e5ag3uezpj2gt9km';
-const kTestnetAddress =
-    'kaspatest:pq3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyxccxflal';
-const kSchnorrValue =
-    '5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa';
-const kPayee =
-    'kaspa:qp8n2k7uklxq4aegau7vawtptkgxsja4kt99lpv6krctwpq8tpc6547zhh9u4';
+const kRegistry =
+    'ee2128c03dfac7f6d74734bb3c879bd999434c47a55945b8a6daae2a1e4a21de';
+const kSpender =
+    '4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa';
 
 http.Response _json(Object? body, [int status = 200]) => http.Response(
   json.encode(body),
@@ -66,334 +66,195 @@ void main() {
     });
   });
 
-  group('resolveName', () {
-    test('resolves a registered name', () async {
-      final service = serviceAnswering({
-        'name': 'kaspa',
-        'ownerType': 0,
-        'owner': 'abcd',
-        'address': kAddress,
-        'deedAddress': 'kaspa:pzdeed',
-        'registryCovenantId': 'ffff',
-      });
+  Map<String, Object?> card({
+    String name = 'alice',
+    Map<String, Object?>? records,
+    int spenderType = 0,
+    String spender = kSpender,
+    String blob = 'a0',
+    bool live = true,
+  }) => {
+    'name': name,
+    'spenderType': spenderType,
+    'spender': spender,
+    'blob': blob,
+    'records': ?records,
+    'live': live,
+  };
 
-      final resolution = await service.resolveName('kaspa');
+  group('claimName', () {
+    Map<String, Object?> answer({
+      String name = 'kaspa',
+      Object? address = kAddress,
+      Map<String, Object?>? card,
+    }) => {
+      'name': name,
+      'ownerType': address == null ? 4 : 0,
+      'address': ?address,
+      'card': ?card,
+      'registryCovenantId': kRegistry,
+    };
+
+    test('claims a registered name', () async {
+      final service = serviceAnswering(answer());
+
+      final claim = await service.claimName('kaspa');
 
       expect(paths, ['/v1/names/kaspa']);
-      expect(resolution?.name, 'kaspa');
-      expect(resolution?.display, 'kaspa.k');
-      expect(resolution?.address, kAddress);
+      expect(claim?.target, 'kaspa');
+      expect(claim?.address, kAddress);
+      expect(claim?.registryCovenantId, kRegistry);
+      expect(claim?.card, isNull);
     });
 
-    test('does not ask about an invalid name', () async {
+    test(
+      'claims a subname with its parent card, asking for the parent',
+      () async {
+        final service = serviceAnswering(
+          answer(
+            name: 'alice',
+            card: card(blob: 'a1', spenderType: 0x86),
+          ),
+        );
+
+        final claim = await service.claimName('bob.alice');
+
+        expect(paths, ['/v1/names/alice']);
+        expect(claim?.target, 'bob.alice');
+        expect(claim?.card?.spenderType, 0x86);
+        expect(claim?.card?.spender.hex, kSpender);
+        expect(claim?.card?.blob.hex, 'a1');
+      },
+    );
+
+    test('does not ask about an invalid name, label or parent', () async {
       final service = serviceAnswering(const {});
 
-      expect(await service.resolveName('-kaspa'), isNull);
-      expect(await service.resolveName(''), isNull);
-      expect(await service.resolveName('a' * 33), isNull);
+      expect(await service.claimName('-kaspa'), isNull);
+      expect(await service.claimName(''), isNull);
+      expect(await service.claimName('a' * 33), isNull);
+      expect(await service.claimName('bob.-alice'), isNull);
+      // A label under the suffix segment, which would otherwise read the name
+      // `k` for every doubled-suffix typo
+      expect(await service.claimName('bob.k'), isNull);
+      expect(await service.claimName('-bob.alice'), isNull);
+      expect(await service.claimName('${'z' * 65}.alice'), isNull);
       expect(paths, isEmpty);
     });
 
     test('answers null for a name that is not registered', () async {
       final service = serviceOver((_) async => _notFound());
 
-      expect(await service.resolveName('kaspa'), isNull);
+      expect(await service.claimName('kaspa'), isNull);
       expect(paths, ['/v1/names/kaspa']);
     });
 
     test('answers null for a malformed name the api rejects', () async {
       final service = serviceAnswering({'code': 'invalid_name'}, 400);
 
-      expect(await service.resolveName('kaspa'), isNull);
+      expect(await service.claimName('kaspa'), isNull);
     });
 
-    test('refuses a name a covenant owns', () async {
-      final service = serviceAnswering({
-        'name': 'kaspa',
-        'ownerType': 4,
-        'owner': 'abcd',
-        'address': null,
-        'registryCovenantId': 'ffff',
-      });
+    test('answers null when a covenant owns the name', () async {
+      final service = serviceAnswering(answer(address: null, card: card()));
 
-      expect(await service.resolveName('kaspa'), isNull);
+      expect(await service.claimName('kaspa'), isNull);
+      expect(await service.claimName('bob.kaspa'), isNull);
+    });
+
+    test('answers null for a subname whose parent has no card', () async {
+      final service = serviceAnswering(answer(name: 'alice'));
+
+      expect(await service.claimName('bob.alice'), isNull);
     });
 
     test('rethrows a server error', () async {
       final service = serviceAnswering({'error': 'boom'}, 500);
 
       await expectLater(
-        service.resolveName('kaspa'),
+        service.claimName('kaspa'),
         throwsA(isA<ApiException>()),
       );
     });
 
     test('fails a lookup with an unexpected shape', () async {
-      final service = serviceOver((_) async => _json(['kaspa']));
+      for (final body in [
+        ['kaspa'],
+        {'address': 42, 'registryCovenantId': kRegistry},
+        answer()..remove('registryCovenantId'),
+        answer(card: card(blob: 'abc')),
+        answer(card: card(blob: 'zz')),
+        answer(card: card(blob: 'a0' * (DotkRecords.blobMaxLength + 1))),
+      ]) {
+        final service = serviceOver((_) async => _json(body));
 
-      await expectLater(
-        service.resolveName('kaspa'),
-        throwsA(isA<FormatException>()),
-      );
-
-      final wrongAddress = serviceAnswering({'address': 42});
-
-      await expectLater(
-        wrongAddress.resolveName('kaspa'),
-        throwsA(isA<FormatException>()),
-      );
+        await expectLater(
+          service.claimName('kaspa'),
+          throwsA(isA<FormatException>()),
+          reason: '$body',
+        );
+      }
     });
   });
 
-  group('resolveName over a subname', () {
-    Map<String, Object?> parent({
-      Map<String, Object?>? records,
-      bool card = true,
-      bool decoded = true,
-      bool live = true,
-      bool covenant = false,
-      String address = kAddress,
-    }) => {
-      'name': 'alice',
-      'ownerType': covenant ? 4 : 0,
-      'owner': 'abcd',
-      if (!covenant) 'address': address,
-      'deedAddress': 'kaspa:pzdeed',
-      if (card)
-        'card': {
-          'key': 'abcd',
-          'outpointTxid': 'ffff',
-          'outpointIndex': 1,
-          'value': 100000000,
-          'spenderType': 0,
-          'spender': 'abcd',
-          'spenderAddress': address,
-          'cardAddress': 'kaspa:pzcard',
-          'recordsHash': 'eeee',
-          'blob': 'a0',
-          if (decoded) 'records': records ?? const <String, Object?>{},
-          'live': live,
-        },
-      'registryCovenantId': 'ffff',
+  group('claimAddress', () {
+    Map<String, Object?> answer(
+      List<String> names, [
+      List<Map<String, Object?>> cards = const [],
+    ]) => {
+      'ownerType': 0,
+      'address': kAddress,
+      'names': names,
+      'cards': cards,
+      'registryCovenantId': kRegistry,
     };
 
-    test(
-      'reads the payee off the parent card, asking only for the parent',
-      () async {
-        final service = serviceAnswering(
-          parent(
-            records: {
-              'sub:bob': {'opaque': kSchnorrValue},
-            },
-          ),
-        );
-
-        final resolution = await service.resolveName('bob.alice');
-
-        expect(paths, ['/v1/names/alice']);
-        expect(resolution?.name, 'bob.alice');
-        expect(resolution?.display, 'bob.alice.k');
-        expect(resolution?.address, kPayee);
-      },
-    );
-
-    test(
-      'renders the payee under the prefix the parent answered with',
-      () async {
-        final service = serviceAnswering(
-          parent(
-            address: kTestnetAddress,
-            records: {
-              'sub:bob': {'opaque': kSchnorrValue},
-            },
-          ),
-        );
-
-        final resolution = await service.resolveName('bob.alice');
-
-        expect(resolution?.address, startsWith('kaspatest:'));
-      },
-    );
-
-    test('answers null for a label the card does not hold', () async {
-      final service = serviceAnswering(
-        parent(
-          records: {
-            'sub:pay': {'opaque': kSchnorrValue},
-            'primary': true,
-          },
-        ),
-      );
-
-      expect(await service.resolveName('bob.alice'), isNull);
-    });
-
-    test('answers null for a value that pays nobody', () async {
-      // A covenant id, which no reader can pay
-      final service = serviceAnswering(
-        parent(
-          records: {
-            'sub:bob': {'opaque': '582104${'11' * 32}'},
-          },
-        ),
-      );
-
-      expect(await service.resolveName('bob.alice'), isNull);
-    });
-
-    test('answers null when the parent has no card', () async {
-      final service = serviceAnswering(parent(card: false));
-
-      expect(await service.resolveName('bob.alice'), isNull);
-    });
-
-    test('answers null for a card whose blob is not a record set', () async {
-      // The indexer leaves the records out when it cannot decode the blob
-      final service = serviceAnswering(parent(decoded: false));
-
-      expect(await service.resolveName('bob.alice'), isNull);
-    });
-
-    test('answers null when a covenant owns the parent', () async {
-      final service = serviceAnswering(
-        parent(
-          covenant: true,
-          records: {
-            'sub:bob': {'opaque': kSchnorrValue},
-          },
-        ),
-      );
-
-      expect(await service.resolveName('bob.alice'), isNull);
-    });
-
-    test('throws when the card is not the live one', () async {
-      // The route serves the live card alone, so this is an indexer to ask
-      // again rather than a label that pays nobody
-      final service = serviceAnswering(
-        parent(
-          live: false,
-          records: {
-            'sub:bob': {'opaque': kSchnorrValue},
-          },
-        ),
-      );
-
-      await expectLater(
-        service.resolveName('bob.alice'),
-        throwsA(isA<FormatException>()),
-      );
-    });
-
-    test('does not ask about an invalid label or parent', () async {
-      final service = serviceAnswering(const {});
-
-      expect(await service.resolveName('bob.-alice'), isNull);
-      // A label under the suffix segment, which would otherwise read the name
-      // `k` for every doubled-suffix typo
-      expect(await service.resolveName('bob.alice.k'), isNull);
-      expect(await service.resolveName('-bob.alice'), isNull);
-      expect(await service.resolveName('${'z' * 65}.alice'), isNull);
-      expect(paths, isEmpty);
-    });
-  });
-
-  group('namesForAddress', () {
     test('orders names by display order', () async {
-      final service = serviceAnswering({
-        'ownerType': 0,
-        'owner': 'abcd',
-        'address': kAddress,
-        'names': ['coinbase', 'kaspa', 'x'],
-        'cards': [],
-        'registryCovenantId': 'ffff',
-      });
+      final service = serviceAnswering(answer(['coinbase', 'kaspa', 'x']));
 
-      expect(await service.namesForAddress(kAddress), [
-        'x',
-        'kaspa',
-        'coinbase',
-      ]);
+      final claim = await service.claimAddress(kAddress);
+
       expect(paths, ['/v1/addresses/$kAddress']);
+      expect(claim?.names, ['x', 'kaspa', 'coinbase']);
+      expect(claim?.primaryCards, isEmpty);
+      expect(claim?.registryCovenantId, kRegistry);
     });
 
-    test('moves the primary name first', () async {
-      final service = serviceAnswering({
-        'names': ['coinbase', 'kaspa', 'x'],
-        'cards': [
-          {
-            'name': 'kaspa',
-            'records': {'url': 'https://kaspa.org', 'primary': true},
-          },
-        ],
-      });
+    test('collects every primary card', () async {
+      final service = serviceAnswering(
+        answer(
+          ['coinbase', 'kaspa', 'x'],
+          [
+            card(name: 'coinbase', records: {'primary': true}),
+            card(name: 'kaspa', records: {'primary': true}, blob: 'a1'),
+            card(name: 'x', records: {'url': 'https://kaspa.org'}),
+          ],
+        ),
+      );
 
-      expect(await service.namesForAddress(kAddress), [
-        'kaspa',
-        'x',
-        'coinbase',
-      ]);
+      final claim = await service.claimAddress(kAddress);
+
+      expect(claim?.primaryCards.keys, ['coinbase', 'kaspa']);
+      expect(claim?.primaryCards['kaspa']?.blob.hex, 'a1');
     });
 
-    test('takes the first primary name by display order', () async {
-      final service = serviceAnswering({
-        'names': ['coinbase', 'kaspa', 'x'],
-        'cards': [
-          {
-            'name': 'coinbase',
-            'records': {'primary': true},
-          },
-          {
-            'name': 'kaspa',
-            'records': {'primary': true},
-          },
-        ],
-      });
+    test('answers null for an address without names', () async {
+      final service = serviceAnswering(answer([]));
 
-      expect(await service.namesForAddress(kAddress), [
-        'kaspa',
-        'x',
-        'coinbase',
-      ]);
+      expect(await service.claimAddress(kAddress), isNull);
     });
 
-    test('ignores cards that are not primary', () async {
-      final service = serviceAnswering({
-        'names': ['coinbase', 'kaspa'],
-        'cards': [
-          {
-            'name': 'coinbase',
-            'records': {'url': 'https://kaspa.org'},
-          },
-        ],
-      });
-
-      expect(await service.namesForAddress(kAddress), ['kaspa', 'coinbase']);
-    });
-
-    test('answers an empty list for an address without names', () async {
-      final service = serviceAnswering({
-        'ownerType': 0,
-        'names': <String>[],
-        'cards': <Object?>[],
-      });
-
-      expect(await service.namesForAddress(kAddress), isEmpty);
-      expect(await service.displayNameForAddress(kAddress), isNull);
-    });
-
-    test('answers an empty list for an address the api rejects', () async {
+    test('answers null for an address the api rejects', () async {
       final service = serviceAnswering({'code': 'invalid_address'}, 400);
 
-      expect(await service.namesForAddress(kAddress), isEmpty);
-      expect(await service.displayNameForAddress(kAddress), isNull);
+      expect(await service.claimAddress(kAddress), isNull);
     });
 
     test('rethrows a server error', () async {
       final service = serviceAnswering({'error': 'boom'}, 500);
 
       await expectLater(
-        service.namesForAddress(kAddress),
+        service.claimAddress(kAddress),
         throwsA(isA<ApiException>()),
       );
     });
@@ -402,25 +263,9 @@ void main() {
       final service = serviceAnswering({'names': 'kaspa'});
 
       await expectLater(
-        service.namesForAddress(kAddress),
+        service.claimAddress(kAddress),
         throwsA(isA<FormatException>()),
       );
-    });
-  });
-
-  group('displayNameForAddress', () {
-    test('is the first name in display form', () async {
-      final service = serviceAnswering({
-        'names': ['coinbase', 'kaspa', 'x'],
-        'cards': [
-          {
-            'name': 'kaspa',
-            'records': {'primary': true},
-          },
-        ],
-      });
-
-      expect(await service.displayNameForAddress(kAddress), 'kaspa.k');
     });
   });
 }

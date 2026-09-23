@@ -1,10 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:retry/retry.dart';
 
 import '../kaspa/api/json_client.dart';
-import '../kaspa/types/address.dart';
-import '../kaspa/types/address_prefix.dart';
+import '../kaspa/utils.dart';
 import 'dotk_names.dart';
-import 'dotk_subname.dart';
+import 'dotk_records.dart';
 import 'dotk_types.dart';
 
 /// Reads the public `.k` names indexer. Lookups happen while the user waits,
@@ -38,11 +39,8 @@ class DotkService {
 
   bool get isEnabled => _client is! VoidJsonClient;
 
-  /// The address [target] resolves to, or null when it cannot be paid. A name
-  /// answers with its owner's address, and a subname with the payee its
-  /// parent's card names for the label. Either may be free, still registering,
-  /// owned by a covenant or malformed.
-  Future<DotkNameResolution?> resolveName(String target) async {
+  /// The indexer's answer for [target], or null when it names nobody to pay
+  Future<DotkNameClaim?> claimName(String target) async {
     final (parent, label) = DotkName.splitTarget(target);
     // The parent becomes a path segment below, so the charset rule holds here
     // whatever the caller already checked
@@ -74,63 +72,27 @@ class DotkService {
     if (address is! String || address.isEmpty) {
       throw FormatException('Unexpected address for $path: $address');
     }
-    if (label == null) {
-      return DotkNameResolution.forName(parent, address: address);
-    }
-
-    return _payee(json, path, target: target, label: label, owner: address);
-  }
-
-  /// The payee one label names on the parent's live card. The address is
-  /// rendered under the prefix the parent's own address carries
-  DotkNameResolution? _payee(
-    Map<String, Object?> json,
-    String path, {
-    required String target,
-    required String label,
-    required String owner,
-  }) {
-    final card = json['card'];
-    if (card == null) {
+    final card = _card(json['card'], path);
+    if (label != null && card == null) {
       return null;
     }
-    if (card is! Map<String, Object?>) {
-      throw FormatException('Unexpected card for $path: $card');
-    }
-    if (card['live'] != true) {
-      throw FormatException('Unexpected card for $path: it is not live');
-    }
-    final records = card['records'];
-    if (records is! Map<String, Object?>?) {
-      throw FormatException('Unexpected records for $path: $records');
-    }
-    if (records == null) {
-      return null;
-    }
-    final prefix = Address.tryParse(owner, expectedPrefix: .unknown)?.prefix;
-    if (prefix == null || prefix == AddressPrefix.unknown) {
-      throw FormatException('Unexpected address for $path: $owner');
-    }
 
-    final payee = DotkSubname.payee(
-      records[DotkSubname.recordKey(label)],
-      prefix,
+    return DotkNameClaim(
+      target: target,
+      address: address,
+      registryCovenantId: _registryCovenantId(json, path),
+      card: card,
     );
-
-    return payee == null
-        ? null
-        : DotkNameResolution.forName(target, address: payee);
   }
 
-  /// The bare names [address] owns, primary name first
-  Future<List<String>> namesForAddress(String address) async {
+  Future<DotkAddressClaim?> claimAddress(String address) async {
     final path = '/addresses/$address';
     final Object? result;
     try {
       result = await _client.get(path).timeout(timeout);
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        return const [];
+        return null;
       }
       rethrow;
     }
@@ -138,26 +100,16 @@ class DotkService {
     final json = _object(result, path);
     final names = _names(json['names'], path);
     if (names.isEmpty) {
-      return names;
+      return null;
     }
 
     names.sort(DotkName.displayOrder);
 
-    final primary = _primaryName(json['cards'], path);
-    if (primary != null && names.remove(primary)) {
-      names.insert(0, primary);
-    }
-
-    return names;
-  }
-
-  Future<String?> displayNameForAddress(String address) async {
-    final names = await namesForAddress(address);
-    if (names.isEmpty) {
-      return null;
-    }
-
-    return DotkName.display(names.first);
+    return DotkAddressClaim(
+      names: names,
+      primaryCards: _primaryCards(json['cards'], path),
+      registryCovenantId: _registryCovenantId(json, path),
+    );
   }
 
   Map<String, Object?> _object(Object? value, String path) {
@@ -185,15 +137,15 @@ class DotkService {
     return names;
   }
 
-  String? _primaryName(Object? value, String path) {
+  Map<String, DotkCard> _primaryCards(Object? value, String path) {
     if (value == null) {
-      return null;
+      return const {};
     }
     if (value is! List) {
       throw FormatException('Unexpected cards for $path: $value');
     }
 
-    final primary = <String>[];
+    final primaryCards = <String, DotkCard>{};
     for (final card in value) {
       if (card is! Map<String, Object?>) {
         throw FormatException('Unexpected card for $path: $card');
@@ -209,14 +161,58 @@ class DotkService {
       if (name is! String) {
         throw FormatException('Unexpected card name for $path: $name');
       }
-      primary.add(name);
+      primaryCards[name] = _card(card, path)!;
     }
 
-    if (primary.isEmpty) {
+    return primaryCards;
+  }
+
+  DotkCard? _card(Object? value, String path) {
+    if (value == null) {
       return null;
     }
-    primary.sort(DotkName.displayOrder);
+    if (value is! Map<String, Object?>) {
+      throw FormatException('Unexpected card for $path: $value');
+    }
+    if (value['live'] != true) {
+      throw FormatException('Unexpected card for $path: it is not live');
+    }
+    final spenderType = value['spenderType'];
+    if (spenderType != DotkOwnerType.schnorr &&
+        spenderType != DotkOwnerType.ecdsaOddY &&
+        spenderType != DotkOwnerType.ecdsaEvenY) {
+      throw FormatException('Unexpected card spender for $path: $spenderType');
+    }
+    final blob = value['blob'];
+    if (blob is! String || blob.length > 2 * DotkRecords.blobMaxLength) {
+      throw FormatException('Unexpected card blob for $path');
+    }
 
-    return primary.first;
+    return DotkCard(
+      spenderType: spenderType as int,
+      spender: _bytes(value['spender'], path, length: 32),
+      blob: _bytes(blob, path),
+    );
+  }
+
+  String _registryCovenantId(Map<String, Object?> json, String path) {
+    final id = json['registryCovenantId'];
+    if (id is! String) {
+      throw FormatException('Unexpected registry covenant id for $path: $id');
+    }
+    return id;
+  }
+
+  Uint8List _bytes(Object? value, String path, {int? length}) {
+    Uint8List? bytes;
+    try {
+      if (value is String && value.length.isEven) {
+        bytes = hexToBytes(value);
+      }
+    } on FormatException catch (_) {}
+    if (bytes == null || (length != null && bytes.length != length)) {
+      throw FormatException('Unexpected bytes for $path: $value');
+    }
+    return bytes;
   }
 }

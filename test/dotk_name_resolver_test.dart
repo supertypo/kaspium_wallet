@@ -4,12 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:kaspium_wallet/dotk/dotk_name_resolver.dart';
+import 'package:kaspium_wallet/dotk/dotk_proof.dart';
+import 'package:kaspium_wallet/dotk/dotk_registry.dart';
 import 'package:kaspium_wallet/dotk/dotk_service.dart';
 import 'package:kaspium_wallet/dotk/dotk_types.dart';
 import 'package:kaspium_wallet/kaspa/api/json_client.dart';
-import 'package:kaspium_wallet/kaspa/types/address_prefix.dart';
 import 'package:logger/logger.dart';
 import 'package:retry/retry.dart';
+
+import 'dotk_fake_node.dart';
 
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
@@ -53,6 +56,7 @@ class FakeIndexer {
         'ownerType': 0,
         'owner': 'abcd',
         'address': address,
+        'registryCovenantId': DotkRegistry.mainnet.covenantId,
       }),
       200,
       headers: {'content-type': 'application/json'},
@@ -73,11 +77,11 @@ void main() {
 
   DotkNameResolver resolverOver(
     DotkService service, {
-    AddressPrefix prefix = AddressPrefix.kaspa,
+    DotkProver? Function() prover = provingEverything,
     Duration timeout = DotkNameResolver.kTimeout,
   }) => DotkNameResolver(
     service: () => service,
-    addressPrefix: () => prefix,
+    prover: prover,
     onLookup: (name, lookup) => calls.add((name: name, lookup: lookup)),
     timeout: timeout,
     log: Logger(level: Level.off),
@@ -132,6 +136,20 @@ void main() {
 
       resolver.textChanged('kaspa.kk');
       expect(resolver.resolved, isNull);
+    });
+
+    test('shows a result only for the name the field holds', () async {
+      final resolver = resolverOver(indexer.service);
+      addTearDown(resolver.dispose);
+
+      await resolver.resolve('kaspa.k');
+
+      expect(resolver.resolvedFor(' Kaspa.k'), isNotNull);
+      expect(resolver.resolvedFor(kAddress), isNull);
+
+      final refresh = resolver.resolve('kaspa.k', refresh: true);
+      expect(resolver.resolvedFor('kaspa.k'), isNull);
+      await refresh;
     });
   });
 
@@ -210,17 +228,22 @@ void main() {
       expect(resolver.resolved, isNull);
     });
 
-    test('reports an address from another network as unregistered', () async {
-      final resolver = resolverOver(
-        indexer.service,
-        prefix: AddressPrefix.kaspaTest,
-      );
-      addTearDown(resolver.dispose);
+    test('reports a name the node does not confirm, and asks again', () async {
+      for (final prover in [
+        () => DotkProver(FakeNode(), registry: .mainnet, prefix: .kaspa),
+        () => null,
+      ]) {
+        indexer.names.clear();
+        final resolver = resolverOver(indexer.service, prover: prover);
+        addTearDown(resolver.dispose);
 
-      final lookup = await resolver.resolve('kaspa.k');
+        final lookup = await resolver.resolve('kaspa.k');
+        await resolver.resolve('kaspa.k');
 
-      expect(lookup?.status, DotkLookupStatus.notRegistered);
-      expect(resolver.resolved, isNull);
+        expect(lookup?.status, DotkLookupStatus.unconfirmed);
+        expect(resolver.resolved, isNull);
+        expect(indexer.requests, 2);
+      }
     });
 
     test('fails when the lookup times out', () async {

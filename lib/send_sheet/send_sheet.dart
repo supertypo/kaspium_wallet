@@ -14,6 +14,7 @@ import '../contacts/contact.dart';
 import '../dotk/dotk_lookup_text.dart';
 import '../dotk/dotk_name_resolver.dart';
 import '../dotk/dotk_names.dart';
+import '../dotk/dotk_proven_name.dart';
 import '../dotk/dotk_types.dart';
 import '../kaspa/kaspa.dart';
 import '../l10n/l10n.dart';
@@ -104,7 +105,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
 
     _nameResolver = DotkNameResolver(
       service: () => ref.read(dotkServiceProvider),
-      addressPrefix: () => ref.read(addressPrefixProvider),
+      prover: () => ref.read(dotkProverProvider),
       onLookup: _onNameLookup,
       log: ref.read(loggerProvider),
     );
@@ -255,6 +256,8 @@ class _SendSheetState extends ConsumerState<SendSheet> {
   Widget build(BuildContext context) {
     final theme = ref.watch(themeProvider);
     final l10n = l10nOf(context);
+    final nameProven =
+        _nameResolver.resolvedFor(_addressController.text) != null;
     final styles = ref.watch(stylesProvider);
 
     Future<void> scanQrCode() async {
@@ -536,11 +539,18 @@ class _SendSheetState extends ConsumerState<SendSheet> {
                               // Kept inside the field's width: a resolved
                               // name wraps to a second line
                               margin: const .only(top: 3, left: 38, right: 38),
-                              child: Text(
-                                _addressValidationText,
-                                textAlign: .center,
-                                style: styles.textStyleParagraphThinPrimary,
-                              ),
+                              child: nameProven
+                                  ? DotkProvenName(
+                                      _addressValidationText,
+                                      style:
+                                          styles.textStyleParagraphThinPrimary,
+                                    )
+                                  : Text(
+                                      _addressValidationText,
+                                      textAlign: .center,
+                                      style:
+                                          styles.textStyleParagraphThinPrimary,
+                                    ),
                             ),
                             // ******* Enter Address Error Container End ******* //
                             const SizedBox(height: 3),

@@ -73,6 +73,7 @@ class SendCompleteSheet extends HookConsumerWidget {
                       address: toAddress,
                       type: .PRIMARY,
                       label: toLabel,
+                      labelProven: toLabel != null,
                     ),
                     const SizedBox(height: 30),
                     TxIdCard(txId: txId),

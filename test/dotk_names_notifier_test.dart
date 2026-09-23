@@ -5,10 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:kaspium_wallet/dotk/dotk_names_notifier.dart';
+import 'package:kaspium_wallet/dotk/dotk_proof.dart';
+import 'package:kaspium_wallet/dotk/dotk_registry.dart';
 import 'package:kaspium_wallet/dotk/dotk_service.dart';
 import 'package:kaspium_wallet/kaspa/api/json_client.dart';
 import 'package:logger/logger.dart';
 import 'package:retry/retry.dart';
+
+import 'dotk_fake_node.dart';
 
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
@@ -49,6 +53,7 @@ class FakeIndexer {
         'address': address,
         'names': names[address] ?? <String>[],
         'cards': <Object?>[],
+        'registryCovenantId': DotkRegistry.mainnet.covenantId,
       }),
       200,
       headers: {'content-type': 'application/json'},
@@ -68,10 +73,12 @@ void main() {
 
   DotkNamesNotifier notifierOver(
     DotkService service, {
+    DotkProver? Function() prover = provingEverything,
     Duration maxAge = const Duration(minutes: 10),
   }) {
     final notifier = DotkNamesNotifier(
       service,
+      prover: prover,
       log: Logger(level: Level.off),
       maxAge: maxAge,
     );
@@ -131,6 +138,15 @@ void main() {
     await pumpEventQueue();
 
     expect(indexer.requests, [kOtherAddress]);
+  });
+
+  test('shows no name without a registry for the network', () async {
+    final notifier = notifierOver(indexer.service, prover: () => null);
+
+    notifier.nameForAddress(kAddress);
+    await pumpEventQueue();
+
+    expect(notifier.nameForAddress(kAddress), isNull);
   });
 
   test('does not hammer an indexer that failed', () async {
@@ -210,6 +226,7 @@ void main() {
   test('does not notify after it is disposed', () async {
     final notifier = DotkNamesNotifier(
       indexer.service,
+      prover: provingEverything,
       log: Logger(level: Level.off),
     );
 

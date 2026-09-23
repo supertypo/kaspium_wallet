@@ -11,6 +11,7 @@ import 'package:kaspium_wallet/contacts/contacts_providers.dart';
 import 'package:kaspium_wallet/core/core_providers.dart';
 import 'package:kaspium_wallet/dotk/dotk_names_notifier.dart';
 import 'package:kaspium_wallet/dotk/dotk_providers.dart';
+import 'package:kaspium_wallet/dotk/dotk_registry.dart';
 import 'package:kaspium_wallet/dotk/dotk_service.dart';
 import 'package:kaspium_wallet/kaspa/api/json_client.dart';
 import 'package:kaspium_wallet/kaspa/kaspa.dart';
@@ -22,6 +23,8 @@ import 'package:kaspium_wallet/wallet_address/wallet_address_notifier.dart';
 import 'package:kaspium_wallet/wallet_address/wallet_address_providers.dart';
 import 'package:kaspium_wallet/widgets/address_card.dart';
 import 'package:retry/retry.dart';
+
+import 'dotk_fake_node.dart';
 
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
@@ -56,6 +59,7 @@ DotkService namingService() => DotkService(
       (_) async => http.Response(
         json.encode({
           'names': ['kaspa'],
+          'registryCovenantId': DotkRegistry.mainnet.covenantId,
         }),
         200,
         headers: {'content-type': 'application/json'},
@@ -71,7 +75,9 @@ Widget wrap(Widget child, {required DotkService service}) => ProviderScope(
     ),
     contactsProvider.overrideWith((ref) => _NoContacts()),
     addressNotifierProvider.overrideWith((ref) => _UnnamedAddresses()),
-    dotkNamesProvider.overrideWith((ref) => DotkNamesNotifier(service)),
+    dotkNamesProvider.overrideWith(
+      (ref) => DotkNamesNotifier(service, prover: provingEverything),
+    ),
   ],
   child: MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,

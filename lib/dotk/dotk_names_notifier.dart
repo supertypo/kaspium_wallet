@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import 'dotk_names.dart';
+import 'dotk_proof.dart';
 import 'dotk_service.dart';
 
 class _CachedName {
@@ -23,6 +25,7 @@ class DotkNamesNotifier extends ChangeNotifier {
   static const kFailureMaxAge = Duration(minutes: 1);
 
   final DotkService service;
+  final DotkProver? Function() prover;
   final Logger? log;
   final Duration maxAge;
 
@@ -33,6 +36,7 @@ class DotkNamesNotifier extends ChangeNotifier {
 
   DotkNamesNotifier(
     this.service, {
+    required this.prover,
     this.log,
     this.maxAge = const Duration(minutes: 10),
   });
@@ -66,23 +70,38 @@ class DotkNamesNotifier extends ChangeNotifier {
   }
 
   Future<void> _lookup(String address) async {
+    String? shown;
+    var carried = false;
+    var maxAge = this.maxAge;
     try {
-      final name = await service.displayNameForAddress(address);
-      _names[address] = _CachedName(name, DateTime.now().add(maxAge));
+      final claim = await service.claimAddress(address);
+      final name = claim == null
+          ? null
+          : await prover()
+                ?.displayName(address, claim)
+                .timeout(DotkService.kTimeout);
+      // The node not backing any name may be the indexer lagging a transfer
+      if (claim != null && name == null) {
+        maxAge = kFailureMaxAge;
+      }
+      shown = name == null ? null : DotkName.display(name);
     } catch (e, st) {
       log?.w('Failed to look up names for $address', error: e, stackTrace: st);
       // A failure says nothing new, so the last name shown stays, but only
       // through one failure
       final last = _names[address];
-      _names[address] = _CachedName(
-        last == null || last.carried ? null : last.name,
-        DateTime.now().add(kFailureMaxAge),
-        carried: true,
-      );
+      shown = last == null || last.carried ? null : last.name;
+      carried = true;
+      maxAge = kFailureMaxAge;
     } finally {
       _pending.remove(address);
     }
 
+    _names[address] = _CachedName(
+      shown,
+      DateTime.now().add(maxAge),
+      carried: carried,
+    );
     if (_disposed) {
       return;
     }

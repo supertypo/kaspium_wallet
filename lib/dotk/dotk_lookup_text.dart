@@ -20,6 +20,7 @@ String dotkLookupText(DotkLookup? lookup, AppLocalizations l10n) {
 String dotkLookupError(DotkLookupStatus status, AppLocalizations l10n) =>
     switch (status) {
       .notRegistered => l10n.dotkNotRegistered,
+      .unconfirmed => l10n.dotkUnconfirmed,
       .unavailable => l10n.dotkDisabledHint,
       _ => l10n.dotkLookupFailed,
     };

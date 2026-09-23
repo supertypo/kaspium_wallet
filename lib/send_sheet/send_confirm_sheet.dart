@@ -294,6 +294,7 @@ class SendConfirmSheet extends HookConsumerWidget {
               AddressCard(
                 address: toAddress,
                 label: toLabel,
+                labelProven: toLabel != null,
                 onPressed: isCompoundTx && !rbf ? selectAddress : null,
               ),
               Container(

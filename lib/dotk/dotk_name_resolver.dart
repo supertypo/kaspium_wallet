@@ -2,9 +2,8 @@ import 'dart:async';
 
 import 'package:logger/logger.dart';
 
-import '../kaspa/types/address.dart';
-import '../kaspa/types/address_prefix.dart';
 import 'dotk_names.dart';
+import 'dotk_proof.dart';
 import 'dotk_service.dart';
 import 'dotk_types.dart';
 
@@ -17,7 +16,7 @@ class DotkNameResolver {
   static const kTimeout = Duration(seconds: 10);
 
   final DotkService Function() service;
-  final AddressPrefix Function() addressPrefix;
+  final DotkProver? Function() prover;
   final void Function(String name, DotkLookup? lookup) onLookup;
   final Duration timeout;
   final Logger? log;
@@ -32,13 +31,17 @@ class DotkNameResolver {
 
   DotkNameResolver({
     required this.service,
-    required this.addressPrefix,
+    required this.prover,
     required this.onLookup,
     this.timeout = kTimeout,
     this.log,
   });
 
   DotkNameResolution? get resolved => _resolved;
+
+  /// The resolution shown for [text], or null when the field moved on
+  DotkNameResolution? resolvedFor(String text) =>
+      _resolved?.name == DotkName.tryNormalize(text) ? _resolved : null;
 
   void textChanged(String text) {
     final name = DotkName.tryNormalize(text);
@@ -77,6 +80,7 @@ class DotkNameResolver {
     }
     var lookup = _lookups[name];
     if (lookup == null) {
+      _resolved = null;
       onLookup(name, null);
       lookup = _lookup(name);
       _lookups[name] = lookup;
@@ -84,9 +88,11 @@ class DotkNameResolver {
 
     final result = await lookup;
 
-    // A failure says nothing about the name, so it is not kept: the next
-    // attempt, at send time, asks again
-    if (result.status == .failed || result.status == .unavailable) {
+    // A failure says nothing about the name and a disagreement may pass, so
+    // neither is kept: the next attempt, at send time, asks again
+    if (result.status == .failed ||
+        result.status == .unavailable ||
+        result.status == .unconfirmed) {
       _lookups.remove(name);
     }
 
@@ -108,20 +114,7 @@ class DotkNameResolver {
     }
 
     try {
-      final resolution = await dotk.resolveName(name).timeout(timeout);
-      if (resolution == null) {
-        return const DotkLookup.notRegistered();
-      }
-
-      final prefix = addressPrefix();
-      if (Address.tryParse(resolution.address, expectedPrefix: prefix) ==
-          null) {
-        // The indexer answered for another network, so the name cannot be
-        // paid from this wallet
-        return const DotkLookup.notRegistered();
-      }
-
-      return DotkLookup.resolved(resolution);
+      return await _prove(dotk, name).timeout(timeout);
     } catch (e, st) {
       log?.w(
         'Failed to resolve ${DotkName.display(name)}',
@@ -143,6 +136,19 @@ class DotkNameResolver {
       return null;
     }
     return lookup;
+  }
+
+  Future<DotkLookup> _prove(DotkService dotk, String name) async {
+    final claim = await dotk.claimName(name);
+    if (claim == null) {
+      return const DotkLookup.notRegistered();
+    }
+    final prover = this.prover();
+    if (prover == null) {
+      return const DotkLookup.unconfirmed();
+    }
+
+    return prover.prove(claim);
   }
 
   void dispose() {
