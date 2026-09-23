@@ -91,6 +91,7 @@ class SendConfirmSheet extends HookConsumerWidget {
             toAddress: toAddress,
             txId: txId,
             note: tx.note,
+            toLabel: toLabel,
           );
 
           Sheets.showAppHeightNineSheet(

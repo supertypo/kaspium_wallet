@@ -132,6 +132,19 @@ class DotkNameResolver {
     }
   }
 
+  /// Resolves [text] afresh for a send. Null when [current] no longer holds
+  /// the same name once the lookup lands
+  Future<DotkLookup?> resolveForSend(
+    String text, {
+    required String Function() current,
+  }) async {
+    final lookup = await resolve(text, refresh: true);
+    if (DotkName.tryNormalize(current()) != DotkName.tryNormalize(text)) {
+      return null;
+    }
+    return lookup;
+  }
+
   void dispose() {
     _disposed = true;
     _debounce?.cancel();

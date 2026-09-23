@@ -8,8 +8,9 @@ import 'dotk_service.dart';
 class _CachedName {
   final String? name;
   final DateTime goodUntil;
+  final bool carried;
 
-  const _CachedName(this.name, this.goodUntil);
+  const _CachedName(this.name, this.goodUntil, {this.carried = false});
 
   bool get isStale => DateTime.now().isAfter(goodUntil);
 }
@@ -70,9 +71,13 @@ class DotkNamesNotifier extends ChangeNotifier {
       _names[address] = _CachedName(name, DateTime.now().add(maxAge));
     } catch (e, st) {
       log?.w('Failed to look up names for $address', error: e, stackTrace: st);
+      // A failure says nothing new, so the last name shown stays, but only
+      // through one failure
+      final last = _names[address];
       _names[address] = _CachedName(
-        null,
+        last == null || last.carried ? null : last.name,
         DateTime.now().add(kFailureMaxAge),
+        carried: true,
       );
     } finally {
       _pending.remove(address);

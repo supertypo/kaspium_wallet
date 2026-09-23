@@ -277,6 +277,37 @@ void main() {
     });
   });
 
+  group('resolveForSend', () {
+    const kOtherAddress =
+        'kaspa:qpsk3cj9pr4dmexwcuj37ma3nm2075ht2yara3xxk4twufmv7kd27vpczqyjd';
+
+    test('pays what the name resolves to now', () async {
+      final resolver = resolverOver(indexer.service);
+      addTearDown(resolver.dispose);
+      await resolver.resolve('kaspa.k');
+
+      indexer.address = kOtherAddress;
+      final lookup = await resolver.resolveForSend(
+        'kaspa.k',
+        current: () => 'kaspa.k',
+      );
+
+      expect(lookup?.resolution?.address, kOtherAddress);
+    });
+
+    test('answers null when the field changed meanwhile', () async {
+      final resolver = resolverOver(indexer.service);
+      addTearDown(resolver.dispose);
+      var field = 'kaspa.k';
+      indexer.delay = const Duration(milliseconds: 50);
+
+      final lookup = resolver.resolveForSend('kaspa.k', current: () => field);
+      field = 'coinbase.k';
+
+      expect(await lookup, isNull);
+    });
+  });
+
   group('dispose', () {
     test('cancels a pending debounce', () async {
       final resolver = resolverOver(indexer.service);

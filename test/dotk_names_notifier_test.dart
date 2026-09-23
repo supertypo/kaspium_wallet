@@ -184,6 +184,18 @@ void main() {
     expect(indexer.requests, [kAddress, kAddress]);
   });
 
+  test('keeps a name it knows when a refresh fails', () async {
+    final notifier = notifierOver(indexer.service, maxAge: Duration.zero);
+    notifier.nameForAddress(kAddress);
+    await pumpEventQueue();
+
+    indexer.status = 500;
+    notifier.nameForAddress(kAddress);
+    await pumpEventQueue();
+
+    expect(notifier.nameForAddress(kAddress), 'kaspa.k');
+  });
+
   test('does nothing when lookups are turned off', () async {
     final notifier = notifierOver(DotkService.url(''));
 

@@ -48,8 +48,9 @@ class TransactionCard extends ConsumerWidget {
     final isContact = contact != null;
     final isThisWallet = addressNotifier.containsAddress(address);
     final isSendType = item.type == .send;
-    // A contact the user named wins over the name the registry knows
-    final dotkName = isContact
+    // A contact the user named wins over the name the registry knows, and
+    // this wallet's own addresses are not labelled with its own names
+    final dotkName = isContact || isThisWallet
         ? null
         : ref.watch(dotkNameForAddressProvider(address));
 

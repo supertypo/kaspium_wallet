@@ -11,6 +11,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../app_icons.dart';
 import '../app_providers.dart';
 import '../contacts/contact.dart';
+import '../dotk/dotk_lookup_text.dart';
 import '../dotk/dotk_name_resolver.dart';
 import '../dotk/dotk_names.dart';
 import '../dotk/dotk_types.dart';
@@ -229,50 +230,10 @@ class _SendSheetState extends ConsumerState<SendSheet> {
     if (!mounted || DotkName.tryNormalize(_addressController.text) != name) {
       return;
     }
-    final l10n = l10nOf(context);
-
-    if (lookup == null) {
-      setState(() {
-        _addressValidationText = l10n.dotkResolving;
-        _sendAddressStyle = .TEXT60;
-      });
-      return;
-    }
-
-    final resolution = lookup.resolution;
-    if (resolution == null) {
-      setState(() {
-        _addressValidationText = _nameLookupError(lookup.status, l10n);
-        _sendAddressStyle = .TEXT60;
-      });
-      return;
-    }
-
     setState(() {
-      _addressValidationText = l10n.dotkResolvedTo(
-        resolution.display,
-        _shortenedAddress(resolution.address),
-      );
-      _sendAddressStyle = .PRIMARY;
+      _addressValidationText = dotkLookupText(lookup, l10nOf(context));
+      _sendAddressStyle = lookup?.resolution == null ? .TEXT60 : .PRIMARY;
     });
-  }
-
-  String _nameLookupError(DotkLookupStatus status, AppLocalizations l10n) =>
-      switch (status) {
-        .notRegistered => l10n.dotkNotRegistered,
-        .unavailable => l10n.dotkDisabledHint,
-        _ => l10n.dotkLookupFailed,
-      };
-
-  String _shortenedAddress(String address) {
-    final index = address.indexOf(':') + 1;
-    final head = index + 10;
-    final tail = address.length - 6;
-    if (tail <= head) {
-      return address;
-    }
-
-    return '${address.substring(0, head)}…${address.substring(tail)}';
   }
 
   void _putNameInAddressField(String text) {
@@ -372,18 +333,21 @@ class _SendSheetState extends ConsumerState<SendSheet> {
         }
         // The name is resolved again here: what was shown while typing is a
         // display cache, never the destination
-        _resolvingName = true;
-        final lookup = await _nameResolver.resolve(addressText, refresh: true);
-        _resolvingName = false;
+        setState(() => _resolvingName = true);
+        final lookup = await _nameResolver.resolveForSend(
+          addressText,
+          current: () => _addressController.text,
+        );
         if (!context.mounted) return;
+        setState(() => _resolvingName = false);
+        if (lookup == null || !_validateRequest()) {
+          return;
+        }
 
-        final resolution = lookup?.resolution;
+        final resolution = lookup.resolution;
         if (resolution == null) {
           setState(() {
-            _addressValidationText = _nameLookupError(
-              lookup?.status ?? .failed,
-              l10n,
-            );
+            _addressValidationText = dotkLookupError(lookup.status, l10n);
           });
           return;
         }
@@ -602,7 +566,11 @@ class _SendSheetState extends ConsumerState<SendSheet> {
           ),
           ActionButtonsWrapper(
             buttons: [
-              PrimaryButton(title: l10n.send, onPressed: sendAction),
+              PrimaryButton(
+                title: l10n.send,
+                disabled: _resolvingName,
+                onPressed: sendAction,
+              ),
               if (widget.uri == null)
                 PrimaryOutlineButton(
                   title: l10n.scanQrCode,
