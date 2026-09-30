@@ -207,6 +207,30 @@ class GrpcService implements RpcService {
     return decodeFeeEstimate(message.estimate);
   }
 
+  @override
+  Future<(FeeEstimate, BigInt?)> getFeeEstimateExperimental() async {
+    final request = KaspadRequest(
+      id: _generateId(),
+      getFeeEstimateExperimentalRequest:
+          GetFeeEstimateExperimentalRequestMessage(verbose: true),
+    );
+
+    final response = await client.call(request);
+    final message = response.getFeeEstimateExperimentalResponse;
+
+    if (message.hasError()) {
+      throw RpcException(message.error);
+    }
+
+    final mass = message.hasVerbose() && message.hasEstimate()
+        ? BigInt.parse(
+            message.verbose.mempoolReadyTransactionsTotalMass
+                .toStringUnsigned(),
+          )
+        : null;
+    return (decodeFeeEstimate(message.estimate), mass);
+  }
+
   /// Submit Transaction
   @override
   Future<String> submitTransaction(

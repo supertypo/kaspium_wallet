@@ -37,6 +37,10 @@ abstract class RpcService {
   /// Fee Estimate
   Future<FeeEstimate> getFeeEstimate();
 
+  /// Fee Estimate with the ready mempool mass, which the node marks
+  /// experimental
+  Future<(FeeEstimate, BigInt?)> getFeeEstimateExperimental();
+
   /// Submit Transaction
   Future<String> submitTransaction(
     RawTransaction transaction, {

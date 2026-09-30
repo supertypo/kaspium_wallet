@@ -49,6 +49,26 @@ extension RawOutputPlurality on RawOutput {
   int get plurality => _utxoPlurality(scriptPublicKey, covenant != null);
 }
 
+/// The masses of a version 1 transaction, as the mempool prices it
+class TxMassesV1 {
+  final BigInt size;
+  final BigInt compute;
+  final BigInt transient;
+
+  const TxMassesV1({
+    required this.size,
+    required this.compute,
+    required this.transient,
+  });
+
+  /// What the fee is charged against: the larger of compute mass and
+  /// transient mass normalized by the transient cofactor of one half
+  BigInt get fee {
+    final normalized = (transient + .one) ~/ .two;
+    return compute > normalized ? compute : normalized;
+  }
+}
+
 class MassCalculator {
   final int massPerTxByte;
   final int massPerScriptPubKeyByte;
@@ -156,6 +176,51 @@ class MassCalculator {
 
     // max(0, harmonic_outs - arithmetic_ins)
     return _max(.zero, harmonicOuts - arithmeticIns);
+  }
+
+  /// transaction_estimated_serialized_size, with the version 1 fields: a
+  /// compute budget on every input and a covenant binding on bound outputs
+  BigInt calcTxEstimatedSerializedSize(RawTransaction tx) {
+    int size = _blankTxSerializedByteSize() + (tx.payload?.length ?? 0);
+    for (final input in tx.inputs) {
+      size += _txInputSerializedByteSize(input);
+      if (tx.version >= 1) {
+        size += 2; // compute budget (uint16)
+      }
+    }
+    for (final output in tx.outputs) {
+      size += _txOutputSerializedByteSize(output);
+      if (output.covenant != null) {
+        size += 2 + kDomainHashSize; // authorizing input and covenant id
+      }
+    }
+    return .from(size);
+  }
+
+  /// Version 1 compute mass replaces sig op counts with declared compute
+  /// budgets: size, [massPerScriptPubKeyByte] per script public key byte,
+  /// 100 per budget unit
+  TxMassesV1 calcTxMassesV1(RawTransaction tx) {
+    assert(tx.version >= 1, 'Version 0 transactions have no compute budget');
+    const kGramsPerComputeBudgetUnit = 100;
+    const kTransientByteToMassFactor = 4;
+
+    final size = calcTxEstimatedSerializedSize(tx);
+    final scriptBytes = tx.outputs.fold(
+      0,
+      (t, o) => t + 2 + o.scriptPublicKey.scriptPublicKey.length,
+    );
+    final budget = tx.inputs.fold(0, (t, i) => t + i.computeBudget);
+    final compute =
+        size * .from(massPerTxByte) +
+        BigInt.from(scriptBytes * massPerScriptPubKeyByte) +
+        BigInt.from(budget * kGramsPerComputeBudgetUnit);
+
+    return TxMassesV1(
+      size: size,
+      compute: compute,
+      transient: size * .from(kTransientByteToMassFactor),
+    );
   }
 
   BigInt calcTxComputeMass({

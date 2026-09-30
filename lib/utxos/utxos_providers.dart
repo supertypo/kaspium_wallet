@@ -90,11 +90,29 @@ final utxoListProvider = Provider.autoDispose((ref) {
   );
 });
 
-final spendableUtxosProvider = Provider.autoDispose((ref) {
-  final utxos = ref.watch(utxoListProvider);
-  final virtualDaaScore = ref.read(lastKnownVirtualDaaScoreProvider);
+/// Outpoints a normal send must not spend, like the change output that a
+/// signed but unsent .k name activation spends
+final reservedOutpointsProvider = StateProvider.family<ISet<Outpoint>, String>(
+  (ref, key) => const ISetConst({}),
+);
 
+String reservedOutpointsKey(String walletId, String networkId) =>
+    '$walletId#$networkId';
+
+/// A covenant UTXO belongs to its covenant, and a reserved one to a pending
+/// transaction, so neither funds a send
+List<Utxo> spendableUtxosOf(
+  Iterable<Utxo> utxos, {
+  required BigInt virtualDaaScore,
+  ISet<Outpoint> reserved = const ISetConst({}),
+}) {
   final spendableUtxos = utxos.where((utxo) {
+    if (utxo.utxoEntry.covenantId != null) {
+      return false;
+    }
+    if (reserved.contains(utxo.outpoint)) {
+      return false;
+    }
     if (!utxo.utxoEntry.isCoinbase) {
       return true;
     }
@@ -106,6 +124,22 @@ final spendableUtxosProvider = Provider.autoDispose((ref) {
   );
 
   return spendableUtxos;
+}
+
+final spendableUtxosProvider = Provider.autoDispose((ref) {
+  final utxos = ref.watch(utxoListProvider);
+  final walletId = ref.watch(walletProvider.select((wallet) => wallet.wid));
+  final networkId = ref.watch(networkIdProvider);
+  final reserved = ref.watch(
+    reservedOutpointsProvider(reservedOutpointsKey(walletId, networkId)),
+  );
+  final virtualDaaScore = ref.read(lastKnownVirtualDaaScoreProvider);
+
+  return spendableUtxosOf(
+    utxos,
+    virtualDaaScore: virtualDaaScore,
+    reserved: reserved,
+  );
 });
 
 final selectedUtxosProvider =

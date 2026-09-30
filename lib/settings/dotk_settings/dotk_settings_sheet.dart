@@ -44,7 +44,7 @@ class DotkSettingsSheet extends HookConsumerWidget {
       final uri = Uri.tryParse(url);
 
       if (uri == null) {
-        UIUtil.showSnackbar('Invalid URL');
+        UIUtil.showSnackbar(l10n.dotkSettingsInvalidUrl);
         return;
       }
 
@@ -88,7 +88,7 @@ class DotkSettingsSheet extends HookConsumerWidget {
     final horizontal = MediaQuery.widthOf(context) * 0.115;
 
     return SheetWidget(
-      title: '.k names API',
+      title: l10n.dotkSettingsApi,
       mainWidget: Column(
         mainAxisAlignment: .start,
         children: [
@@ -96,7 +96,7 @@ class DotkSettingsSheet extends HookConsumerWidget {
           Container(
             margin: .symmetric(horizontal: horizontal),
             child: Text(
-              'Set a custom .k names API URL or leave blank to use the default one.',
+              l10n.dotkSettingsApiHint,
               style: styles.textStyleAccount,
               textAlign: .center,
             ),

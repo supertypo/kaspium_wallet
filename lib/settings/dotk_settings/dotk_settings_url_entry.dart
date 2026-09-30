@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/core_providers.dart';
+import '../../l10n/l10n.dart';
 import '../../settings_drawer/double_line_item.dart';
 import '../../widgets/sheet_util.dart';
 import '../setting_item.dart';
@@ -13,6 +14,7 @@ class DotkSettingsUrlEntry extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = l10nOf(context);
     final dotkEnabled = ref.watch(dotkEnabledProvider);
     final dotkApiUrl = ref.watch(dotkApiUrlProvider);
 
@@ -31,7 +33,7 @@ class DotkSettingsUrlEntry extends ConsumerWidget {
         : dotkApiUrl;
 
     return DoubleLineItem(
-      heading: '.k names API',
+      heading: l10n.dotkSettingsApi,
       defaultMethod: StringSelectionItem(displayUrl),
       icon: Icons.api,
       onPressed: changeApiUrl,

@@ -53,6 +53,16 @@ class KaspiumLightTheme extends BaseTheme {
   Color successDark30 = greenLight.withValues(alpha: 0.3);
 
   @override
+  Color warning = const Color(0xFF8A5300);
+  @override
+  Color danger = const Color(0xFFC62828);
+
+  @override
+  Color dotkAccent = const Color(0xFF0E7D6E);
+  @override
+  Color dotkInk = const Color(0xFF141917);
+
+  @override
   Color background = white;
   @override
   Color background40 = white.withValues(alpha: 0.4);

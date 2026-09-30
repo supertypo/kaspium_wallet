@@ -44,7 +44,9 @@ class DotkNamesNotifier extends ChangeNotifier {
   /// The display name for [address] right now. A miss or a stale entry
   /// schedules a lookup, and listeners are notified when it lands.
   String? nameForAddress(String address) {
-    if (!service.isEnabled) {
+    // Without a registry for the network no name can be proven, so nothing
+    // is asked
+    if (!service.isEnabled || prover() == null) {
       return null;
     }
 
@@ -106,6 +108,25 @@ class DotkNamesNotifier extends ChangeNotifier {
       return;
     }
     notifyListeners();
+  }
+
+  /// Asks again about [addresses], as after the wallet moved a name or its
+  /// primary. The names shown stay until the answers land.
+  void refresh(Iterable<String> addresses) {
+    final now = DateTime.now().subtract(const Duration(seconds: 1));
+    for (final address in addresses) {
+      final cached = _names[address];
+      if (cached != null) {
+        _names[address] = _CachedName(
+          cached.name,
+          now,
+          carried: cached.carried,
+        );
+      }
+    }
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   @override

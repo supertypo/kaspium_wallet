@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_providers.dart';
+import '../dotk/dotk_names.dart';
 import '../wallet_address/wallet_address.dart';
 import '../widgets/address_widgets.dart';
 
@@ -34,7 +35,7 @@ class AccountAddressWidget extends ConsumerWidget {
           child: AddressAdaptiveText(
             address: address.encoded,
             type: .PRIMARY60,
-            label: dotkName,
+            label: dotkName == null ? null : DotkName.isolated(dotkName),
           ),
         ),
       ],

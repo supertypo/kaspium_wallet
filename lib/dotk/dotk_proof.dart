@@ -1,22 +1,25 @@
-import 'dart:convert';
-
-import 'package:blake3_dart/blake3_dart.dart';
 import 'package:collection/collection.dart';
 
 import '../kaspa/rpc/rpc_service.dart';
 import '../kaspa/types.dart';
 import '../kaspa/utils.dart';
 import 'dotk_names.dart';
+import 'dotk_owned_name.dart';
+import 'dotk_record_edits.dart';
 import 'dotk_records.dart';
 import 'dotk_registry.dart';
 import 'dotk_subname.dart';
+import 'dotk_tx.dart';
 import 'dotk_types.dart';
 
 /// Proves the indexer's answers against the node, never what it leaves out
 class DotkProver {
-  static const _cardMagic = 'dotk';
-
+  /// Cards [displayName] proves at most for one address. Each costs two
+  /// addresses in the node query
   static const maxPrimariesProven = 10;
+
+  /// Addresses per node query when proving a whole wallet's names
+  static const ownedChunk = 400;
 
   final RpcService rpc;
   final DotkRegistry registry;
@@ -37,7 +40,7 @@ class DotkProver {
     final (parent, label) = DotkName.splitTarget(claim.target);
     final deedAddress = this.deedAddress(parent, pair.$1, pair.$2);
     final card = label == null ? null : claim.card;
-    final cardAddress = card == null ? null : this.cardAddress(parent, card);
+    final cardAddress = card == null ? null : _cardAddressOf(parent, card);
 
     final utxos = await rpc.getUtxosByAddresses([
       deedAddress,
@@ -52,11 +55,13 @@ class DotkProver {
         DotkNameResolution.forName(parent, address: owner.encoded),
       );
     }
-    if (card == null || !_isCard(utxos, cardAddress!, deed)) {
+    if (card == null ||
+        cardAddress == null ||
+        !_isCard(utxos, cardAddress, deed)) {
       return const DotkLookup.unconfirmed();
     }
 
-    final records = DotkRecords.tryDecode(card.blob);
+    final records = _records(card);
     final payee = DotkSubname.payee(
       records?[DotkSubname.recordKey(label)],
       prefix,
@@ -70,6 +75,10 @@ class DotkProver {
     );
   }
 
+  /// The name to show for [address]: the proven card that set primary most
+  /// recently, else the first name when the node proves it. Only
+  /// [maxPrimariesProven] cards are proven, so with more than that the name
+  /// can differ from the winner [proveOwned] marks.
   Future<String?> displayName(String address, DotkAddressClaim claim) async {
     final owner = Address.tryParse(address, expectedPrefix: prefix);
     final pair = owner == null ? null : ownerOf(owner);
@@ -77,9 +86,24 @@ class DotkProver {
       return null;
     }
 
-    final primaryCards = claim.primaryCards.entries
-        .where((entry) => DotkName.isValid(entry.key))
-        .take(maxPrimariesProven);
+    final listed = claim.names.where(DotkName.isValid).toSet();
+    final hints = claim.primaryHints;
+    final primaryCards =
+        [
+              ...claim.cards.entries.where(
+                (entry) => hints.contains(entry.key),
+              ),
+              ...claim.cards.entries.where(
+                (entry) => !hints.contains(entry.key),
+              ),
+            ]
+            .where(
+              (entry) =>
+                  listed.contains(entry.key) &&
+                  _records(entry.value)?[DotkRecordEdits.primaryKey] == true,
+            )
+            .take(maxPrimariesProven)
+            .toList();
     final first = claim.names.firstWhereOrNull(DotkName.isValid);
     final deeds = {
       for (final name in [...primaryCards.map((entry) => entry.key), ?first])
@@ -87,7 +111,7 @@ class DotkProver {
     };
     final cards = {
       for (final MapEntry(key: name, value: card) in primaryCards)
-        name: cardAddress(name, card),
+        name: ?_cardAddressOf(name, card),
     };
 
     final utxos = await rpc.getUtxosByAddresses([
@@ -99,10 +123,7 @@ class DotkProver {
     Utxo? primaryDeed;
     for (final MapEntry(key: name, value: cardAddress) in cards.entries) {
       final deed = _deed(utxos, deeds[name]!);
-      if (deed == null ||
-          !_isCard(utxos, cardAddress, deed) ||
-          DotkRecords.tryDecode(claim.primaryCards[name]!.blob)?['primary'] !=
-              true) {
+      if (deed == null || !_isCard(utxos, cardAddress, deed)) {
         continue;
       }
       if (primaryDeed == null || _isNewer(deed, primaryDeed)) {
@@ -115,6 +136,101 @@ class DotkProver {
     }
 
     return first != null && _deed(utxos, deeds[first]!) != null ? first : null;
+  }
+
+  /// Every name in [claims] the node backs, one claim per owner address. A
+  /// card counts only when the node holds it as output 1 of the deed's
+  /// transaction.
+  Future<List<DotkOwnedName>> proveOwned(
+    Map<String, DotkAddressClaim> claims,
+  ) async {
+    final deeds = <(String, String), String>{};
+    final cards = <(String, String), String>{};
+    for (final MapEntry(key: address, value: claim) in claims.entries) {
+      final owner = Address.tryParse(address, expectedPrefix: prefix);
+      final pair = owner == null ? null : ownerOf(owner);
+      if (pair == null || claim.registryCovenantId != registry.covenantId) {
+        continue;
+      }
+      for (final name in claim.names.where(DotkName.isValid)) {
+        deeds[(address, name)] = deedAddress(name, pair.$1, pair.$2);
+        final card = claim.cards[name];
+        final cardAddress = card == null ? null : _cardAddressOf(name, card);
+        if (cardAddress != null) {
+          cards[(address, name)] = cardAddress;
+        }
+      }
+    }
+
+    final wanted = {...deeds.values, ...cards.values}.toList();
+    final utxos = <Utxo>[];
+    for (var i = 0; i < wanted.length; i += ownedChunk) {
+      final end = i + ownedChunk < wanted.length
+          ? i + ownedChunk
+          : wanted.length;
+      utxos.addAll(await rpc.getUtxosByAddresses(wanted.sublist(i, end)));
+    }
+
+    final owned = <DotkOwnedName>[];
+    final primaries = <String, (int, Utxo)>{};
+    for (final MapEntry(key: (address, name), value: deedAddress)
+        in deeds.entries) {
+      final deed = _deed(utxos, deedAddress);
+      if (deed == null) {
+        continue;
+      }
+      final card = claims[address]!.cards[name];
+      final cardAddress = cards[(address, name)];
+      final cardUtxo = cardAddress == null
+          ? null
+          : _cardUtxo(utxos, cardAddress, deed);
+      final records = cardUtxo == null ? null : _records(card!);
+      final recordsState = card == null
+          ? DotkRecordsState.none
+          : cardUtxo == null
+          ? DotkRecordsState.unproven
+          : records == null
+          ? DotkRecordsState.unreadable
+          : DotkRecordsState.proven;
+      final setsPrimary = records?[DotkRecordEdits.primaryKey] == true;
+
+      if (setsPrimary) {
+        final best = primaries[address];
+        if (best == null || _isNewer(deed, best.$2)) {
+          primaries[address] = (owned.length, deed);
+        }
+      }
+      owned.add(
+        DotkOwnedName(
+          name: name,
+          address: address,
+          deed: deed,
+          card: cardUtxo == null ? null : card,
+          listedCard: card,
+          cardUtxo: cardUtxo,
+          records: records ?? const {},
+          recordsState: recordsState,
+          primary: setsPrimary ? .older : .none,
+        ),
+      );
+    }
+
+    for (final (index, _) in primaries.values) {
+      final name = owned[index];
+      owned[index] = DotkOwnedName(
+        name: name.name,
+        address: name.address,
+        deed: name.deed,
+        card: name.card,
+        listedCard: name.listedCard,
+        cardUtxo: name.cardUtxo,
+        records: name.records,
+        recordsState: name.recordsState,
+        primary: .winner,
+      );
+    }
+
+    return owned;
   }
 
   static (int, Uint8List)? ownerOf(Address address) => address.when(
@@ -131,56 +247,25 @@ class DotkProver {
         hash.length == 32 ? (DotkOwnerType.scriptHash, hash) : null,
   );
 
-  static Uint8List deedState(String name, int ownerType, Uint8List owner) {
-    final bytes = ascii.encode(name);
-    final padded = Uint8List(32)..setAll(0, bytes);
+  String deedAddress(String name, int ownerType, Uint8List owner) => registry
+      .deedAddress(DotkState.activeDeed(name, ownerType, owner))
+      .encoded;
 
-    return Uint8List.fromList([
-      0x01, 0x02, // active
-      0x20, ...blake3(bytes),
-      0x01, ownerType,
-      0x20, ...owner,
-      0x20, ...padded,
-    ]);
+  String cardAddress(String name, DotkCard card) => DotkCardState.forBlob(
+    name,
+    card.blob,
+    spenderType: card.spenderType,
+    spender: card.spender,
+  ).address(registry).encoded;
+
+  /// Null for a card no key could spend, which the node cannot hold
+  String? _cardAddressOf(String name, DotkCard card) {
+    try {
+      return cardAddress(name, card);
+    } on DotkTxError {
+      return null;
+    }
   }
-
-  String deedAddress(String name, int ownerType, Uint8List owner) {
-    final redeem = Uint8List.fromList(registry.deedBytecode)
-      ..setAll(
-        DotkRegistry.deedStateOffset,
-        deedState(name, ownerType, owner),
-      );
-
-    return _scriptHashAddress(redeem);
-  }
-
-  static Uint8List cardRedeemScript(String name, DotkCard card) {
-    final spender = card.spenderType == DotkOwnerType.schnorr
-        ? [0x20, ...card.spender, 0xac] // OP_CHECKSIG
-        : [
-            0x21,
-            0x02 | (card.spenderType & 0x01),
-            ...card.spender,
-            0xab, // OP_CHECKSIGECDSA
-          ];
-
-    return Uint8List.fromList([
-      0x20, ...blake3(ascii.encode(name)),
-      0x20, ...blake3(card.blob),
-      0x75, 0x75, // OP_DROP OP_DROP
-      0x04, ...ascii.encode(_cardMagic),
-      0x88, // OP_EQUALVERIFY
-      ...spender,
-    ]);
-  }
-
-  String cardAddress(String name, DotkCard card) =>
-      _scriptHashAddress(cardRedeemScript(name, card));
-
-  String _scriptHashAddress(Uint8List redeem) => Address.scriptHash(
-    prefix: prefix,
-    hash: blake2bDigest(data: redeem),
-  ).encoded;
 
   Utxo? _deed(Iterable<Utxo> utxos, String deedAddress) {
     final deeds = utxos.where(
@@ -191,6 +276,13 @@ class DotkProver {
 
     return deeds.length == 1 ? deeds.single : null;
   }
+
+  /// A card's records, or null for a blob that does not decode or is longer
+  /// than a record set may be
+  static Map<String, Object>? _records(DotkCard card) =>
+      card.blob.length > DotkRecords.blobMaxLength
+      ? null
+      : DotkRecords.tryDecode(card.blob);
 
   /// The most recent claim to primary wins, and the outpoint breaks a tie
   static bool _isNewer(Utxo a, Utxo b) {
@@ -211,7 +303,10 @@ class DotkProver {
   /// A card speaks for its name only as output 1 of the transaction that
   /// created the deed's current UTXO
   bool _isCard(Iterable<Utxo> utxos, String cardAddress, Utxo deed) =>
-      utxos.any(
+      _cardUtxo(utxos, cardAddress, deed) != null;
+
+  Utxo? _cardUtxo(Iterable<Utxo> utxos, String cardAddress, Utxo deed) =>
+      utxos.firstWhereOrNull(
         (utxo) =>
             utxo.address == cardAddress &&
             utxo.outpoint.transactionId == deed.outpoint.transactionId &&

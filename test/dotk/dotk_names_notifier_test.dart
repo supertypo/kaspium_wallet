@@ -140,13 +140,28 @@ void main() {
     expect(indexer.requests, [kOtherAddress]);
   });
 
-  test('shows no name without a registry for the network', () async {
+  test('asks nothing without a registry for the network', () async {
     final notifier = notifierOver(indexer.service, prover: () => null);
 
     notifier.nameForAddress(kAddress);
     await pumpEventQueue();
 
     expect(notifier.nameForAddress(kAddress), isNull);
+    expect(indexer.requests, isEmpty);
+  });
+
+  test('a refresh asks again and shows the old name meanwhile', () async {
+    final notifier = notifierOver(indexer.service);
+    notifier.nameForAddress(kAddress);
+    await pumpEventQueue();
+    indexer.names[kAddress] = ['coinbase'];
+
+    notifier.refresh([kAddress]);
+    expect(notifier.nameForAddress(kAddress), 'kaspa.k');
+    await pumpEventQueue();
+
+    expect(notifier.nameForAddress(kAddress), 'coinbase.k');
+    expect(indexer.requests, [kAddress, kAddress]);
   });
 
   test('does not hammer an indexer that failed', () async {

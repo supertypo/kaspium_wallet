@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_icons.dart';
 import '../app_providers.dart';
+import '../dotk/dotk_registry.dart';
 import '../l10n/l10n.dart';
 import '../settings/block_explorer.dart';
 import '../settings/dotk_settings.dart';
@@ -24,6 +25,10 @@ class NetworkMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final styles = ref.watch(stylesProvider);
     final l10n = l10nOf(context);
+    // .k names need a registry, which only some networks have
+    final dotkOffered =
+        DotkRegistry.forNetworkId(ref.watch(networkIdProvider)) != null;
+    final dotkEnabled = ref.watch(dotkEnabledProvider);
 
     return DrawerWrapper(
       child: Column(
@@ -57,10 +62,14 @@ class NetworkMenu extends ConsumerWidget {
                     const NodeSettingsEntry(),
                     const ItemDivider(),
                     const KaspaApiSettingsUrlEntry(),
-                    const ItemDivider(),
-                    const DotkSettingsEntry(),
-                    const ItemDivider(),
-                    const DotkSettingsUrlEntry(),
+                    if (dotkOffered) ...[
+                      const ItemDivider(),
+                      const DotkSettingsEntry(),
+                      if (dotkEnabled) ...[
+                        const ItemDivider(),
+                        const DotkSettingsUrlEntry(),
+                      ],
+                    ],
                     // const ItemDivider(),
                     // const KasplexSettingsApiUrlEntry(),
                     const ItemDivider(),

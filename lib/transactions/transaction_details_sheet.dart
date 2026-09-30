@@ -5,6 +5,7 @@ import '../app_icons.dart';
 import '../app_providers.dart';
 import '../app_router.dart';
 import '../contacts/contact_add_sheet.dart';
+import '../dotk/dotk_pending_txs.dart';
 import '../l10n/l10n.dart';
 import '../util/ui_util.dart';
 import '../util/util.dart';
@@ -38,6 +39,8 @@ class TransactionDetailsSheet extends ConsumerWidget {
     final theme = ref.watch(themeProvider);
     final l10n = l10nOf(context);
     final styles = ref.watch(stylesProvider);
+    final pending = txItem?.pending ?? false;
+    final cancelable = pending && !isWalletDotkTx(ref, txItem!.tx);
 
     void addContact() {
       appRouter.pop(context);
@@ -75,12 +78,13 @@ class TransactionDetailsSheet extends ConsumerWidget {
           ],
           ActionButtonsWrapper(
             buttons: [
-              if (txItem?.pending ?? false)
-                PrimaryButton(
-                  title: l10n.cancelTransaction,
-                  onPressed: cancelTransaction,
-                )
-              else if (displayAddressButton) ...[
+              if (pending) ...[
+                if (cancelable)
+                  PrimaryButton(
+                    title: l10n.cancelTransaction,
+                    onPressed: cancelTransaction,
+                  ),
+              ] else if (displayAddressButton) ...[
                 Stack(
                   children: [
                     PrimaryButton(

@@ -67,13 +67,36 @@ class DotkNameClaim {
 
 class DotkAddressClaim {
   final List<String> names;
-  final Map<String, DotkCard> primaryCards;
+
+  /// The live card of every listed name that has one
+  final Map<String, DotkCard> cards;
+
+  /// The names the indexer read as primary: only an order for what to prove
+  /// first, since the prover decodes every blob itself
+  final Set<String> primaryHints;
   final String registryCovenantId;
 
   const DotkAddressClaim({
     required this.names,
     required this.registryCovenantId,
-    this.primaryCards = const {},
+    this.cards = const {},
+    this.primaryHints = const {},
+  });
+}
+
+/// What the indexer knows about the key of a name. A free key comes with the
+/// gap a registration spends, as its two bounds.
+class DotkKeyInfo {
+  final bool free;
+  final Uint8List? gapLo;
+  final Uint8List? gapHi;
+  final String registryCovenantId;
+
+  const DotkKeyInfo({
+    required this.free,
+    required this.registryCovenantId,
+    this.gapLo,
+    this.gapHi,
   });
 }
 

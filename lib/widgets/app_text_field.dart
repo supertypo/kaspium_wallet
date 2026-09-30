@@ -46,6 +46,9 @@ class AppTextField extends ConsumerWidget {
   final TextCapitalization? textCapitalization;
   final int? maxLines;
   final bool autocorrect;
+  final bool enableSuggestions;
+  final SmartDashesType? smartDashesType;
+  final SmartQuotesType? smartQuotesType;
   final String? hintText;
   final TextFieldButton? prefixButton;
   final TextFieldButton? suffixButton;
@@ -99,6 +102,9 @@ class AppTextField extends ConsumerWidget {
     this.topMargin = 0,
     this.autofocus = false,
     this.enableInteractiveSelection = true,
+    this.enableSuggestions = true,
+    this.smartDashesType,
+    this.smartQuotesType,
   });
 
   @override
@@ -130,6 +136,9 @@ class AppTextField extends ConsumerWidget {
                 textAlign: textAlign,
                 keyboardAppearance: keyboardAppearance,
                 autocorrect: autocorrect,
+                enableSuggestions: enableSuggestions,
+                smartDashesType: smartDashesType,
+                smartQuotesType: smartQuotesType,
                 maxLines: maxLines,
                 focusNode: focusNode,
                 controller: controller,

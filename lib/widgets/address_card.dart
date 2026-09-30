@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../app_providers.dart';
+import '../dotk/dotk_names.dart';
 import '../kaspa/kaspa.dart';
 import 'address_widgets.dart';
 
@@ -56,7 +57,10 @@ class AddressCard extends HookConsumerWidget {
 
     // A contact or an address label the user set wins over the name the
     // registry knows the address by
-    final shownLabel = label ?? localLabel ?? (showLabel ? dotkName : null);
+    final shownLabel =
+        label ??
+        localLabel ??
+        (showLabel && dotkName != null ? DotkName.isolated(dotkName) : null);
 
     final horizontal = MediaQuery.widthOf(context) * 0.105;
 

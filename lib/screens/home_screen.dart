@@ -7,10 +7,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../app_providers.dart';
 import '../app_router.dart';
 import '../chain_state/chain_state.dart';
+import '../dotk/dotk_names.dart';
+import '../dotk/dotk_tx_providers.dart';
 import '../l10n/l10n.dart';
 import '../main_card/main_card.dart';
 import '../settings_drawer/settings_drawer.dart';
 import '../util/routes.dart';
+import '../util/ui_util.dart';
 import '../wallet_home/wallet_home.dart';
 import '../widgets/network_banner.dart';
 import 'lock_screen.dart';
@@ -25,6 +28,27 @@ class HomeScreen extends HookConsumerWidget {
     l10nWrapper.l10n = l10nOf(context);
 
     final scaffoldKey = ref.watch(homePageScaffoldKeyProvider);
+
+    // Finishes .k name registrations a restart interrupted, and says when one
+    // stops, wherever the user is
+    ref.listen(dotkRegistrationProvider, (_, registrations) {
+      final names = ref.read(dotkWalletNamesProvider);
+      final labels = ref.read(dotkNamesProvider);
+      for (final entry in registrations.takeNewlyDone()) {
+        // The indexer lists the new name a little after the node shows it,
+        // and the owner's label asks again once it does
+        unawaited(
+          names
+              .awaitName(entry.name, entry.owner)
+              .then((_) => labels.refresh([entry.owner])),
+        );
+      }
+      for (final name in registrations.takeNewFailures()) {
+        UIUtil.showSnackbar(
+          l10nOf(context).dotkRegistrationStoppedNotice(DotkName.display(name)),
+        );
+      }
+    });
 
     ref.listen(walletAuthProvider.select((walletAuth) => walletAuth.isLocked), (
       wasLocked,

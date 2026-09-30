@@ -13,7 +13,8 @@ import 'dotk_types.dart';
 ///
 /// A payee is the claim of whoever owns the parent name.
 abstract class DotkSubname {
-  static const _recordPrefix = 'sub:';
+  /// What every subname record key starts with, ahead of the label
+  static const recordPrefix = 'sub:';
 
   /// The whole CBOR item: the head bytes `0x58 0x21`, which introduce a byte
   /// string of 33 bytes, then the scheme byte and its 32-byte payload.
@@ -21,7 +22,7 @@ abstract class DotkSubname {
 
   static final _secp256k1 = ECCurve_secp256k1();
 
-  static String recordKey(String label) => '$_recordPrefix$label';
+  static String recordKey(String label) => '$recordPrefix$label';
 
   /// The address a record value pays, or null.
   static String? payee(Object? bytes, AddressPrefix prefix) {

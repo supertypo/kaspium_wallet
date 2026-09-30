@@ -28,8 +28,12 @@ http.Response _notFound() =>
 
 void main() {
   final paths = <String>[];
+  final headers = <Map<String, String>>[];
 
-  setUp(paths.clear);
+  setUp(() {
+    paths.clear();
+    headers.clear();
+  });
 
   DotkService serviceOver(
     Future<http.Response> Function(http.Request request) handle,
@@ -40,6 +44,7 @@ void main() {
       minRequestGap: .zero,
       client: MockClient((request) {
         paths.add(request.url.path);
+        headers.add(request.headers);
         return handle(request);
       }),
     ),
@@ -200,7 +205,7 @@ void main() {
   group('claimAddress', () {
     Map<String, Object?> answer(
       List<String> names, [
-      List<Map<String, Object?>> cards = const [],
+      List<Object?> cards = const [],
     ]) => {
       'ownerType': 0,
       'address': kAddress,
@@ -216,7 +221,7 @@ void main() {
 
       expect(paths, ['/v1/addresses/$kAddress']);
       expect(claim?.names, ['x', 'kaspa', 'coinbase']);
-      expect(claim?.primaryCards, isEmpty);
+      expect(claim?.primaryHints, isEmpty);
       expect(claim?.registryCovenantId, kRegistry);
     });
 
@@ -234,8 +239,31 @@ void main() {
 
       final claim = await service.claimAddress(kAddress);
 
-      expect(claim?.primaryCards.keys, ['coinbase', 'kaspa']);
-      expect(claim?.primaryCards['kaspa']?.blob.hex, 'a1');
+      expect(claim?.primaryHints, {'coinbase', 'kaspa'});
+      expect(claim?.cards['kaspa']?.blob.hex, 'a1');
+    });
+
+    test('drops only the malformed cards', () async {
+      final service = serviceAnswering(
+        answer(
+          ['coinbase', 'kaspa', 'x'],
+          [
+            card(name: 'coinbase', records: {'primary': true}, live: false),
+            card(name: 'kaspa', records: {'primary': true}, blob: 'a1'),
+            card(name: 'x', blob: 'zz'),
+            card(name: 'y', spenderType: 7),
+            {'name': 42},
+            {...card(name: 'z'), 'records': 'primary'},
+            'card',
+          ],
+        ),
+      );
+
+      final claim = await service.claimAddress(kAddress);
+
+      expect(claim?.names, ['x', 'kaspa', 'coinbase']);
+      expect(claim?.cards.keys, ['kaspa']);
+      expect(claim?.primaryHints, {'kaspa'});
     });
 
     test('answers null for an address without names', () async {
@@ -266,6 +294,88 @@ void main() {
         service.claimAddress(kAddress),
         throwsA(isA<FormatException>()),
       );
+    });
+  });
+
+  test('reads the indexed DAA score, also from a 503', () async {
+    for (final status in [200, 503]) {
+      final indexed = await serviceAnswering({
+        'lastBlock': {'daaScore': 42},
+        'registryCovenantId': kRegistry,
+      }, status).indexed();
+      expect(indexed.daaScore, BigInt.from(42));
+      expect(indexed.registryCovenantId, kRegistry);
+    }
+    // Asked past any cache, since it proves what the indexer has seen
+    expect(paths.last, '/v1/health');
+    expect(headers.last['Cache-Control'], 'no-cache');
+
+    final unknown = await serviceAnswering({'lastBlock': null}).indexed();
+    expect(unknown.daaScore, isNull);
+    final failed = serviceAnswering({
+      'lastBlock': {'daaScore': 42},
+      'selfTest': {'proven': false},
+    }, 503);
+    await expectLater(failed.indexed(), throwsException);
+  });
+
+  group('keyInfo', () {
+    const lo =
+        '0000000000000000000000000000000000000000000000000000000000000001';
+    const hi =
+        'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+    Map<String, Object?> answer(String kind, {Object? covering}) => {
+      'kind': kind,
+      'covering': ?covering,
+      'registryCovenantId': kRegistry,
+    };
+
+    test('answers null for an invalid name, asking only the api', () async {
+      final service = serviceAnswering({'code': 'invalid_name'}, 400);
+
+      expect(await service.keyInfo('-kaspa'), isNull);
+      expect(await service.keyInfo(''), isNull);
+      expect(paths, isEmpty);
+      expect(await service.keyInfo('kaspa'), isNull);
+      expect(paths, ['/v1/names/kaspa/key']);
+    });
+
+    test('reads a taken key, and a free one with its gap', () async {
+      for (final kind in ['active', 'pending', 'ownerUnknown']) {
+        final info = await serviceAnswering(answer(kind)).keyInfo('kaspa');
+
+        expect(info?.free, isFalse, reason: kind);
+        expect(info?.gapLo, isNull, reason: kind);
+        expect(info?.registryCovenantId, kRegistry, reason: kind);
+      }
+
+      final info = await serviceAnswering(
+        answer('free', covering: {'lo': lo, 'hi': hi}),
+      ).keyInfo('kaspa');
+      expect(info?.free, isTrue);
+      expect(info?.gapLo?.hex, lo);
+      expect(info?.gapHi?.hex, hi);
+      expect(info?.registryCovenantId, kRegistry);
+    });
+
+    test('fails a lookup with an unexpected shape', () async {
+      for (final body in [
+        {'kind': 42, 'registryCovenantId': kRegistry},
+        answer('free'),
+        answer('free', covering: 'gap'),
+        answer('free', covering: {'lo': lo}),
+        answer('free', covering: {'lo': lo, 'hi': 'ff'}),
+        answer('active')..remove('registryCovenantId'),
+      ]) {
+        final service = serviceAnswering(body);
+
+        await expectLater(
+          service.keyInfo('kaspa'),
+          throwsA(isA<FormatException>()),
+          reason: '$body',
+        );
+      }
     });
   });
 }

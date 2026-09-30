@@ -9,12 +9,16 @@ class SheetWidget extends ConsumerWidget {
   final Widget? leftWidget;
   final Widget? rightWidget;
   final String title;
+
+  /// Drawn instead of [title], and read out with its own labels
+  final Widget? titleWidget;
   final Widget mainWidget;
   final Widget bottomWidget;
 
   const SheetWidget({
     super.key,
     required this.title,
+    this.titleWidget,
     this.leftWidget,
     this.rightWidget,
     required this.mainWidget,
@@ -46,11 +50,13 @@ class SheetWidget extends ConsumerWidget {
                       margin: const .symmetric(horizontal: 4, vertical: 8),
                       child: FittedBox(
                         fit: .scaleDown,
-                        child: Text(
-                          title.toUpperCase(),
-                          style: styles.textStyleHeader,
-                          textAlign: .center,
-                        ),
+                        child: titleWidget != null
+                            ? Semantics(header: true, child: titleWidget)
+                            : Text(
+                                title.toUpperCase(),
+                                style: styles.textStyleHeader,
+                                textAlign: .center,
+                              ),
                       ),
                     ),
                   ],

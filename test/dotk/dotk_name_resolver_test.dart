@@ -229,21 +229,19 @@ void main() {
     });
 
     test('reports a name the node does not confirm, and asks again', () async {
-      for (final prover in [
-        () => DotkProver(FakeNode(), registry: .mainnet, prefix: .kaspa),
-        () => null,
-      ]) {
-        indexer.names.clear();
-        final resolver = resolverOver(indexer.service, prover: prover);
-        addTearDown(resolver.dispose);
+      final resolver = resolverOver(
+        indexer.service,
+        prover: () =>
+            DotkProver(FakeNode(), registry: .mainnet, prefix: .kaspa),
+      );
+      addTearDown(resolver.dispose);
 
-        final lookup = await resolver.resolve('kaspa.k');
-        await resolver.resolve('kaspa.k');
+      final lookup = await resolver.resolve('kaspa.k');
+      await resolver.resolve('kaspa.k');
 
-        expect(lookup?.status, DotkLookupStatus.unconfirmed);
-        expect(resolver.resolved, isNull);
-        expect(indexer.requests, 2);
-      }
+      expect(lookup?.status, DotkLookupStatus.unconfirmed);
+      expect(resolver.resolved, isNull);
+      expect(indexer.requests, 2);
     });
 
     test('fails when the lookup times out', () async {
@@ -289,15 +287,25 @@ void main() {
       expect(indexer.requests, 2);
     });
 
-    test('is unavailable when lookups are turned off', () async {
-      final resolver = resolverOver(DotkService.url(''));
-      addTearDown(resolver.dispose);
+    test(
+      'treats a name as plain text with lookups off or no registry',
+      () async {
+        for (final resolver in [
+          resolverOver(DotkService.url('')),
+          resolverOver(indexer.service, prover: () => null),
+        ]) {
+          addTearDown(resolver.dispose);
 
-      final lookup = await resolver.resolve('kaspa.k');
+          resolver.textChanged('kaspa.k');
+          await afterDebounce();
 
-      expect(lookup?.status, DotkLookupStatus.unavailable);
-      expect(resolver.resolved, isNull);
-    });
+          expect(resolver.isName('kaspa.k'), isFalse);
+          expect(await resolver.resolve('kaspa.k'), isNull);
+        }
+        expect(calls, isEmpty);
+        expect(indexer.requests, 0);
+      },
+    );
   });
 
   group('resolveForSend', () {

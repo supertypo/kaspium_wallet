@@ -167,9 +167,319 @@
   "doContinue": "Continue",
   "donate": "Donate",
   "dontShowAgain": "Don't show again",
+  "dotkAvailabilityFailed": "The wallet did not get an answer for {name}. Try again.",
+  "@dotkAvailabilityFailed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkAvailable": "{name} is available",
+  "@dotkAvailable": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkBeingListed": "This name is registered and will show here in a moment.",
+  "dotkBinaryValue": "Binary value ({count, plural, =1{1 byte} other{{count} bytes}})",
+  "@dotkBinaryValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkCanClose": "You can close this sheet. The wallet finishes while the app is open.",
+  "dotkCannotUndo": "You cannot undo a transfer. Only the new owner can move the name back.",
+  "dotkCardHeld": "Held by the card",
+  "dotkCardHeldNote": "The {amount} stays with the name's records and comes back when the name leaves this wallet.",
+  "@dotkCardHeldNote": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkCardReturned": "Returned to this wallet",
+  "dotkChangeConfirming": "A change to this name is being confirmed",
+  "dotkChangeOwner": "Change",
+  "dotkChecking": "Checking {name}…",
+  "@dotkChecking": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkChooseMyAddress": "Choose from My Addresses",
+  "dotkConfirmRegistration": "Confirm Registration",
+  "dotkConfirmTransfer": "Confirm Transfer",
+  "dotkCost": "Cost",
+  "dotkDetails": "Details",
   "dotkDisabledHint": "Please enable .k names in the network settings",
+  "dotkDismiss": "Dismiss",
+  "dotkDismissUnsafe": "Your reservation can still be on the network. If you dismiss it, you can lose {deposit}.",
+  "@dotkDismissUnsafe": {
+    "placeholders": {
+      "deposit": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkErrorFeeRose": "The network fee rose. Go back to see the new fee.",
+  "dotkErrorFunds": "There are not enough funds for this. Add funds and try again.",
+  "dotkErrorGeneric": "Something went wrong. Try again.",
+  "dotkErrorNetwork": "The wallet did not get an answer from the network. Try again.",
+  "dotkErrorNotAddress": "This is not a Kaspa address or a .k name",
+  "dotkErrorOtherNetwork": "This address is on another network",
+  "dotkErrorSameOwner": "This address already owns {name}",
+  "@dotkErrorSameOwner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkErrorScriptAddress": "A script address cannot own a name from this wallet",
+  "dotkErrorStale": "The name changed on the network. Open it again and try again.",
+  "dotkErrorTooLarge": "This transaction is too large for the network. Try again with fewer coins.",
+  "dotkEvicted": "The reservation expired and was evicted. The {deposit} it held is lost. Resume starts a new registration.",
+  "@dotkEvicted": {
+    "placeholders": {
+      "deposit": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkInvalidName": "Use a to z, 0 to 9 and -, with no - at the start or end",
+  "dotkIsYours": "{name} is yours",
+  "@dotkIsYours": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkKeepOpen": "Keep Kaspium open for about a minute. If the app closes, open it again within {minutes} minutes to finish, or you lose {deposit}.",
+  "@dotkKeepOpen": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "deposit": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkListUpdates": "The Names list updates in a few seconds.",
+  "dotkListing": "Being listed",
+  "dotkLockedNote": "The {amount} comes back if you release the name.",
+  "@dotkLockedNote": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkLockedWithName": "Locked with the name",
   "dotkLookupFailed": "Could not resolve name",
+  "dotkNameGone": "This name is no longer on this wallet's addresses.",
+  "dotkNameHint": "name",
+  "dotkNameLabel": "dot k",
+  "dotkNameTooLong": "A name has at most 32 characters",
+  "dotkNames": "Names",
+  "dotkNamesChecked": "Checked {count, plural, =1{1 address} other{{count} addresses}}",
+  "@dotkNamesChecked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkNamesChecking": "Checking {checked} of {total, plural, =1{1 address} other{{total} addresses}}",
+  "@dotkNamesChecking": {
+    "placeholders": {
+      "checked": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkNamesEmpty": "No .k names on this wallet's addresses",
+  "dotkNamesIncomplete": "The wallet did not get an answer for {count, plural, =1{1 address} other{{count} addresses}}. The list can be incomplete.",
+  "@dotkNamesIncomplete": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkNamesSummary": "{names, plural, =1{1 name} other{{names} names}} on {addresses, plural, =1{1 address} other{{addresses} addresses}}",
+  "@dotkNamesSummary": {
+    "placeholders": {
+      "names": {
+        "type": "int"
+      },
+      "addresses": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkNetworkFee": "Network fee",
+  "dotkNetworkFees": "Network fees",
+  "dotkNewOwner": "New owner",
+  "dotkNewOwnerHint": "Address, .k name or @contact",
+  "dotkNoPrimaryOffer": "{label} has no primary name yet. Make {name} the name that wallets and explorers show for this address.",
+  "@dotkNoPrimaryOffer": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkNoRecords": "No records",
+  "dotkNotConfirmedYet": "The reservation was not confirmed in 2 minutes. It can still go through.",
+  "dotkNotEnoughKas": "Not enough funds. You need at least {need} with network fees, and can spend {have} now.",
+  "@dotkNotEnoughKas": {
+    "placeholders": {
+      "need": {
+        "type": "String"
+      },
+      "have": {
+        "type": "String"
+      }
+    }
+  },
   "dotkNotRegistered": "Name not registered",
+  "dotkOlderPrimary": "Older primary",
+  "dotkOlderPrimaryNotice": "{winner} is the primary name of this address, because it set primary later. Unset primary here so that only one name claims it.",
+  "@dotkOlderPrimaryNotice": {
+    "placeholders": {
+      "winner": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkOutsideWallet": "This address is not in this wallet. After the transfer, only its owner can move {name}.",
+  "@dotkOutsideWallet": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkOwnedBy": "Owned by {label}",
+  "@dotkOwnedBy": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkOwner": "Owner",
+  "dotkOwnerIs": "Owner: {label}",
+  "@dotkOwnerIs": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkPriceFor": "for names of {count, plural, =1{1 character} other{{count} characters}}",
+  "@dotkPriceFor": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkPriceForLong": "for names of 5 or more characters",
+  "dotkPriceLength": "{count, plural, =1{1 character} other{{count} characters}}",
+  "@dotkPriceLength": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dotkPriceLengthLong": "5 or more",
+  "dotkPrices": "Prices",
+  "dotkPrimary": "Primary",
+  "dotkPrimaryAuth": "Update {name}",
+  "@dotkPrimaryAuth": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkPrimaryUpdated": "{name} updated",
+  "@dotkPrimaryUpdated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkProven": "Proven",
+  "dotkRaced": "Someone reserved this part of the registry at the same moment. Nothing was spent.",
+  "dotkRecordAvatar": "Avatar",
+  "dotkRecordDescription": "Description",
+  "dotkRecordDiscord": "Discord",
+  "dotkRecordEmail": "Email",
+  "dotkRecordGithub": "GitHub",
+  "dotkRecordLocation": "Location",
+  "dotkRecordTelegram": "Telegram",
+  "dotkRecordTwitter": "X (Twitter)",
+  "dotkRecordWebsite": "Website",
+  "dotkRecords": "Records",
+  "dotkRecordsCleared": "The records of this name are cleared, so the new owner starts with none.",
+  "dotkRecordsConfirming": "The records of this name are still being confirmed. Try again in a moment.",
+  "dotkRecordsNote": "Records are claims by the name's owner. Tap a link to open it. Hold to copy.",
+  "dotkRecordsPending": "These records are being confirmed",
+  "dotkRecordsUnproven": "These records failed the wallet's check, so they are hidden",
+  "dotkRecordsUnreadable": "The wallet cannot read the records of this name",
+  "dotkRefresh": "Refresh",
+  "dotkRegister": "Register",
+  "dotkRegisterAuth": "Register {name}",
+  "@dotkRegisterAuth": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkRegisterName": "Register a Name",
+  "dotkRegistered": "{name} is registered",
+  "@dotkRegistered": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkRegistering": "Registering",
+  "dotkRegistrationFailedTitle": "Registration stopped",
+  "dotkRegistrationFee": "Registration fee",
+  "dotkRegistrationGone": "This registration is no longer in this wallet.",
+  "dotkRegistrationStopped": "The registration stopped before it finished. Resume to try again.",
+  "dotkRegistrationStoppedNotice": "The registration of {name} stopped. Open dot.k in the settings menu to resume it.",
+  "@dotkRegistrationStoppedNotice": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkReservationDropped": "The reservation did not go through, and nothing was spent. Resume to try again.",
   "dotkResolvedTo": "{name} resolves to {address}",
   "@dotkResolvedTo": {
     "placeholders": {
@@ -182,7 +492,101 @@
     }
   },
   "dotkResolving": "Resolving name…",
+  "dotkResume": "Resume",
+  "dotkRetry": "Retry",
+  "dotkSetPrimary": "Set as Primary",
+  "dotkSetPrimaryBody": "{name} becomes the name that wallets and explorers show for {label}.",
+  "@dotkSetPrimaryBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkSettingsApi": ".k names API",
+  "dotkSettingsApiHint": "Set a custom .k names API URL or leave blank to use the default one.",
+  "dotkSettingsEnable": "Enable .k names",
+  "dotkSettingsHeader": ".k names",
+  "dotkSettingsInvalidUrl": "Invalid URL",
+  "dotkStepActivate": "Activate the name",
+  "dotkStepReserve": "Reserve the name",
+  "dotkStepWait": "Wait for the reservation to be confirmed",
+  "dotkStepWaitNote": "The name stays hidden until then",
+  "dotkStopped": "Stopped",
+  "dotkSubnames": "Subnames",
+  "dotkThisWallet": "{label} · this wallet",
+  "@dotkThisWallet": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkTotal": "Total",
+  "dotkTransaction": "Transaction",
+  "dotkTransferAuth": "Transfer {name}",
+  "@dotkTransferAuth": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkTransferred": "{name} transferred",
+  "@dotkTransferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkTransferredTo": "to {target}",
+  "@dotkTransferredTo": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkTransferring": "Transferring",
   "dotkUnconfirmed": "Name could not be confirmed",
+  "dotkUnfinished": "{name} is not finished. {minutes, plural, =1{1 minute} other{{minutes} minutes}} left before {deposit} is at risk.",
+  "@dotkUnfinished": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      },
+      "deposit": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkUnfinishedLate": "{name} is not finished. Resume it now.",
+  "@dotkUnfinishedLate": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkUnsetPrimary": "Unset Primary",
+  "dotkUnsetPrimaryBody": "The name stays on this address. The wallet saves its records again, without the primary mark.",
+  "dotkViewName": "View {name}",
+  "@dotkViewName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "dotkViewOnSite": "View on dotk.name",
+  "dotkWatchOnly": "This wallet cannot sign, so it cannot change names. It is a watch-only wallet.",
   "emailAction": "Email {email}",
   "@emailAction": {
     "placeholders": {

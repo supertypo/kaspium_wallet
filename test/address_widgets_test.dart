@@ -9,6 +9,7 @@ import 'package:kaspium_wallet/contacts/contact.dart';
 import 'package:kaspium_wallet/contacts/contacts_notifier.dart';
 import 'package:kaspium_wallet/contacts/contacts_providers.dart';
 import 'package:kaspium_wallet/core/core_providers.dart';
+import 'package:kaspium_wallet/dotk/dotk_names.dart';
 import 'package:kaspium_wallet/dotk/dotk_names_notifier.dart';
 import 'package:kaspium_wallet/dotk/dotk_providers.dart';
 import 'package:kaspium_wallet/dotk/dotk_registry.dart';
@@ -24,7 +25,7 @@ import 'package:kaspium_wallet/wallet_address/wallet_address_providers.dart';
 import 'package:kaspium_wallet/widgets/address_card.dart';
 import 'package:retry/retry.dart';
 
-import 'dotk_fake_node.dart';
+import 'dotk/dotk_fake_node.dart';
 
 const kBaseUrl = 'https://api.dotk.name/v1';
 const kAddress =
@@ -119,7 +120,7 @@ void main() {
         service: namingService(),
       );
 
-      expect(find.text('kaspa.k'), findsOneWidget);
+      expect(find.text(DotkName.isolated('kaspa.k')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -175,7 +176,7 @@ void main() {
       // The local label stays, and the name is an extra line above the
       // address.
       expect(richTexts(tester), contains('Receive 0'));
-      expect(find.text('kaspa.k'), findsOneWidget);
+      expect(find.text(DotkName.isolated('kaspa.k')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

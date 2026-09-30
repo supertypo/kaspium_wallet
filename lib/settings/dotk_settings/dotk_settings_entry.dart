@@ -30,7 +30,7 @@ class DotkSettingsEntry extends ConsumerWidget {
     }
 
     return DoubleLineItemTwo(
-      heading: '.k names',
+      heading: l10n.dotkSettingsHeader,
       text: selectedOption,
       icon: Icons.badge_outlined,
       onPressed: showDialog,

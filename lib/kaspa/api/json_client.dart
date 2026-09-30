@@ -63,23 +63,33 @@ class JsonClient {
     http.Client? client,
   }) : _client = client ?? http.Client();
 
-  Future<JsonResponse> getResponse(String path) {
+  /// [accept] lists statuses besides 200 whose body is still the answer
+  Future<JsonResponse> getResponse(
+    String path, {
+    Map<String, String> headers = const {},
+    Set<int> accept = const {},
+  }) {
     final url = Uri.parse('$baseUrl$path');
 
     return _send(
       'GET',
-      () => _client.get(url, headers: _getHeaders),
+      () => _client.get(url, headers: {..._getHeaders, ...headers}),
       (response) {
         return (
           data: json.decode(response.body) as Object?,
           headers: response.headers,
         );
       },
+      accept: accept,
     );
   }
 
-  Future<Object?> get(String path) async {
-    final response = await getResponse(path);
+  Future<Object?> get(
+    String path, {
+    Map<String, String> headers = const {},
+    Set<int> accept = const {},
+  }) async {
+    final response = await getResponse(path, headers: headers, accept: accept);
     return response.data;
   }
 
@@ -103,8 +113,9 @@ class JsonClient {
   Future<T> _send<T>(
     String method,
     Future<http.Response> Function() send,
-    T Function(http.Response response) decode,
-  ) {
+    T Function(http.Response response) decode, {
+    Set<int> accept = const {},
+  }) {
     return r.retry(
       () async {
         await _waitTurn();
@@ -114,8 +125,22 @@ class JsonClient {
           _pushedBack(_retryAfter(response));
           throw ApiException(429, method: method);
         }
-        if (response.statusCode != 200) {
+        if (response.statusCode != 200 &&
+            !accept.contains(response.statusCode)) {
           throw ApiException(response.statusCode, method: method);
+        }
+
+        if (response.statusCode != 200) {
+          // Another status answers only with a body that reads, unlike a
+          // proxy's error page
+          final T answer;
+          try {
+            answer = decode(response);
+          } on FormatException {
+            throw ApiException(response.statusCode, method: method);
+          }
+          _accepted();
+          return answer;
         }
 
         _accepted();
@@ -174,7 +199,11 @@ class VoidJsonClient extends JsonClient {
   VoidJsonClient() : super('');
 
   @override
-  Future<JsonResponse> getResponse(String path) {
+  Future<JsonResponse> getResponse(
+    String path, {
+    Map<String, String> headers = const {},
+    Set<int> accept = const {},
+  }) {
     throw Exception('Void GET request: $path');
   }
 

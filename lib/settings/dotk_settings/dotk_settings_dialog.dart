@@ -20,7 +20,7 @@ class DotkSettingsDialog extends ConsumerWidget {
       title: Padding(
         padding: const .only(bottom: 10),
         child: Text(
-          'Enable .k names',
+          l10n.dotkSettingsEnable,
           style: styles.textStyleDialogHeader,
         ),
       ),

@@ -17,6 +17,14 @@ abstract class BaseTheme {
   Color get successDark;
   Color get successDark30;
 
+  Color get warning;
+  Color get danger;
+
+  // dotk.name's brand colors: the accent for small text such as links, chips
+  // and the shield, and the ink of the dot.k wordmark.
+  Color get dotkAccent;
+  Color get dotkInk;
+
   Color get background;
   Color get background40;
   Color get background00;

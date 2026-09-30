@@ -39,12 +39,22 @@ class DotkNameResolver {
 
   DotkNameResolution? get resolved => _resolved;
 
+  /// Whether [text] is a name this wallet resolves. With lookups off, or on a
+  /// network without a registry, a name is plain text like any other.
+  bool isName(String text) => _normalize(text) != null;
+
+  String? _normalize(String text) => service().isEnabled && prover() != null
+      ? DotkName.tryNormalize(text)
+      : null;
+
   /// The resolution shown for [text], or null when the field moved on
-  DotkNameResolution? resolvedFor(String text) =>
-      _resolved?.name == DotkName.tryNormalize(text) ? _resolved : null;
+  DotkNameResolution? resolvedFor(String text) {
+    final name = _normalize(text);
+    return name != null && _resolved?.name == name ? _resolved : null;
+  }
 
   void textChanged(String text) {
-    final name = DotkName.tryNormalize(text);
+    final name = _normalize(text);
     if (name != _name) {
       _name = name;
       _resolved = null;
@@ -63,7 +73,7 @@ class DotkNameResolver {
   /// unless [refresh] asks the indexer again. Every caller gets its answer,
   /// but only the newest lookup is reported through [onLookup].
   Future<DotkLookup?> resolve(String text, {bool refresh = false}) async {
-    final name = DotkName.tryNormalize(text);
+    final name = _normalize(text);
     if (name == null || _disposed) {
       return null;
     }

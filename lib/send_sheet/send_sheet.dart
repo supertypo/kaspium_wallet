@@ -193,7 +193,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
           setState(() => _contactButtonVisible = true);
         }
         // A name left in the field should not wait out the debounce
-        if (DotkName.isName(_addressController.text)) {
+        if (_nameResolver.isName(_addressController.text)) {
           _nameResolver.resolve(_addressController.text);
         }
       }
@@ -274,7 +274,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
       final address = uri?.address;
       if (address == null) {
         // A `.k` name is not a URI, but the field takes one
-        if (DotkName.isName(qrData)) {
+        if (_nameResolver.isName(qrData)) {
           _putNameInAddressField(qrData);
           return;
         }
@@ -330,7 +330,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
       String destination;
       String? label;
 
-      if (DotkName.isName(addressText)) {
+      if (_nameResolver.isName(addressText)) {
         if (_resolvingName) {
           return;
         }
@@ -686,7 +686,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
     final addressText = _addressController.text.trim();
     bool isContact = addressText.startsWith('@');
     // A well-formed name is checked by resolving it, not by parsing it
-    final isName = DotkName.isName(addressText);
+    final isName = _nameResolver.isName(addressText);
     if (addressText.isEmpty) {
       setState(() {
         _addressValidationText = l10n.addressMising;
@@ -884,7 +884,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
               if (data == null || data.text == null) {
                 return;
               }
-              if (DotkName.isName(data.text!)) {
+              if (_nameResolver.isName(data.text!)) {
                 _putNameInAddressField(data.text!);
                 return;
               }
@@ -998,7 +998,7 @@ class _SendSheetState extends ConsumerState<SendSheet> {
         },
         onSubmitted: (text) {
           // Don't wait out the debounce once the user is done typing
-          if (DotkName.isName(text)) {
+          if (_nameResolver.isName(text)) {
             _nameResolver.resolve(text);
           }
         },

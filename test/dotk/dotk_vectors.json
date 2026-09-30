@@ -1,0 +1,617 @@
+{
+ "_source": "supertypo/dotk-sdk src/generated/mainnet/vectors.json at 3a4cc66; its recordsDecode and subname sections.",
+ "recordsDecode": [
+  {
+   "what": "the mixed map, every item kind carried",
+   "blob": "b06161182a61622061631b0102030405060708616443a0ff00616580616682617861796167a06168a1616b016169d8186174616af6616bf93c00616cfb0000000000000000616df820616e6174616ff5617082f4f5",
+   "records": {
+    "a": {
+     "opaque": "182a"
+    },
+    "b": {
+     "opaque": "20"
+    },
+    "c": {
+     "opaque": "1b0102030405060708"
+    },
+    "d": {
+     "opaque": "43a0ff00"
+    },
+    "e": {
+     "opaque": "80"
+    },
+    "f": {
+     "opaque": "8261786179"
+    },
+    "g": {
+     "opaque": "a0"
+    },
+    "h": {
+     "opaque": "a1616b01"
+    },
+    "i": {
+     "opaque": "d8186174"
+    },
+    "j": {
+     "opaque": "f6"
+    },
+    "k": {
+     "opaque": "f93c00"
+    },
+    "l": {
+     "opaque": "fb0000000000000000"
+    },
+    "m": {
+     "opaque": "f820"
+    },
+    "n": "t",
+    "o": true,
+    "p": {
+     "opaque": "82f4f5"
+    }
+   },
+   "reencoded": "b06161182a61622061631b0102030405060708616443a0ff00616580616682617861796167a06168a1616b016169d8186174616af6616bf93c00616cfb0000000000000000616df820616e6174616ff5617082f4f5"
+  },
+  {
+   "what": "keys out of order, rewritten sorted on save",
+   "blob": "a2617a016161f5",
+   "records": {
+    "a": true,
+    "z": {
+     "opaque": "01"
+    }
+   },
+   "reencoded": "a26161f5617a01"
+  },
+  {
+   "what": "a non-preferred head inside a value, carried verbatim",
+   "blob": "a161785a00000002abcd",
+   "records": {
+    "x": {
+     "opaque": "5a00000002abcd"
+    }
+   },
+   "reencoded": "a161785a00000002abcd"
+  },
+  {
+   "what": "non-UTF-8 text inside a skipped item is bytes",
+   "blob": "a161788161ff",
+   "records": {
+    "x": {
+     "opaque": "8161ff"
+    }
+   },
+   "reencoded": "a161788161ff"
+  },
+  {
+   "what": "arrays nested to the depth cap",
+   "blob": "a16178818181818181818101",
+   "records": {
+    "x": {
+     "opaque": "818181818181818101"
+    }
+   },
+   "reencoded": "a16178818181818181818101"
+  },
+  {
+   "what": "tags nested to the depth cap",
+   "blob": "a16178c6c6c6c6c6c6c6c601",
+   "records": {
+    "x": {
+     "opaque": "c6c6c6c6c6c6c6c601"
+    }
+   },
+   "reencoded": "a16178c6c6c6c6c6c6c6c601"
+  },
+  {
+   "what": "arrays nested past the depth cap",
+   "blob": "a1617881818181818181818101",
+   "fault": "too deep"
+  },
+  {
+   "what": "tags nested past the depth cap",
+   "blob": "a16178c6c6c6c6c6c6c6c6c601",
+   "fault": "too deep"
+  },
+  {
+   "what": "an empty container at the cap is a container too",
+   "blob": "a16178818181818181818180",
+   "fault": "too deep"
+  },
+  {
+   "what": "not a map",
+   "blob": "80",
+   "fault": "not a CBOR map"
+  },
+  {
+   "what": "an eight-byte length",
+   "blob": "a161785b0000000000000001ab",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "a reserved argument",
+   "blob": "a161781c",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "an indefinite-length byte string",
+   "blob": "a161785f41abff",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "an indefinite-length map as a value",
+   "blob": "a16178bfff",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "an ill-formed simple value",
+   "blob": "a16178f800",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "a double as a key",
+   "blob": "a1fb000000000000000001",
+   "fault": "unsupported CBOR head"
+  },
+  {
+   "what": "a tag whose item is truncated",
+   "blob": "a16178c6",
+   "fault": "truncated"
+  },
+  {
+   "what": "an array running past the blob",
+   "blob": "a16178830102",
+   "fault": "truncated"
+  },
+  {
+   "what": "a map whose pair count leaves it short",
+   "blob": "a2617801",
+   "fault": "truncated"
+  },
+  {
+   "what": "a half float as a key",
+   "blob": "a1f93c0001",
+   "fault": "not text"
+  },
+  {
+   "what": "a byte-string key",
+   "blob": "a1417801",
+   "fault": "not text"
+  },
+  {
+   "what": "a duplicate key whose second value is opaque",
+   "blob": "a26178f5617801",
+   "fault": "twice"
+  },
+  {
+   "what": "text that is not UTF-8 under the map",
+   "blob": "a1617861ff",
+   "fault": "not UTF-8"
+  },
+  {
+   "what": "trailing bytes after an opaque last value",
+   "blob": "a161780100",
+   "fault": "trailing"
+  }
+ ],
+ "subname": [
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "address": "kaspa:qp8n2k7uklxq4aegau7vawtptkgxsja4kt99lpv6krctwpq8tpc6547zhh9u4"
+  },
+  {
+   "network": "testnet-10",
+   "input": "dev.team.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "dev.team",
+   "records": {
+    "sub:dev.team": {
+     "opaque": "5821032222222222222222222222222222222222222222222222222222222222222222"
+    }
+   },
+   "address": "kaspatest:pq3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyxccxflal"
+  },
+  {
+   "network": "simnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821863333333333333333333333333333333333333333333333333333333333333333"
+    }
+   },
+   "address": "kaspasim:qyprxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvca3cz5km7"
+  },
+  {
+   "network": "devnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821854444444444444444444444444444444444444444444444444444444444444444"
+    }
+   },
+   "address": "kaspadev:qyp5g3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3qucd5dser"
+  },
+  {
+   "network": "mainnet",
+   "input": "Bob.Alice.K",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "address": "kaspa:qp8n2k7uklxq4aegau7vawtptkgxsja4kt99lpv6krctwpq8tpc6547zhh9u4"
+  },
+  {
+   "network": "mainnet",
+   "input": "alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   }
+  },
+  {
+   "network": "mainnet",
+   "input": "k.k",
+   "ownerType": 0,
+   "parent": "k",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   }
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "no-suffix"
+  },
+  {
+   "network": "mainnet",
+   "input": "alice.k.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-parent"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-parent"
+  },
+  {
+   "network": "mainnet",
+   "input": "k.alice.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-label"
+  },
+  {
+   "network": "mainnet",
+   "input": ".k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-parent"
+  },
+  {
+   "network": "mainnet",
+   "input": "a..b.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-label"
+  },
+  {
+   "network": "mainnet",
+   "input": "-bob.alice.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-label"
+  },
+  {
+   "network": "mainnet",
+   "input": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.alice.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-label"
+  },
+  {
+   "network": "mainnet",
+   "input": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.alice.k",
+   "ownerType": 0,
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-label"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 4,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "parent-in-covenant"
+  },
+  {
+   "network": "mainnet",
+   "input": "pay.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "pay",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    },
+    "sub:dev.team": {
+     "opaque": "5821032222222222222222222222222222222222222222222222222222222222222222"
+    }
+   }
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": "kaspa:qqq"
+   },
+   "fault": "not-bytes"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": true
+   },
+   "fault": "not-bytes"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "182a"
+    }
+   },
+   "fault": "not-bytes"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "58204f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-length"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821fe4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-scheme"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821024f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-scheme"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821874f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-scheme"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821044f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "held-by-covenant"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821040000000000000000000000000000000000000000000000000000000000000000"
+    }
+   },
+   "fault": "held-by-covenant"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821000000000000000000000000000000000000000000000000000000000000000000"
+    }
+   },
+   "fault": "zero-payload"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "582100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   },
+   "fault": "not-a-point"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "590021004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-length"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5a00000021004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+    }
+   },
+   "fault": "bad-length"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5f5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaff"
+    }
+   },
+   "fault": "bad-length"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "58"
+    }
+   },
+   "fault": "bad-length"
+  },
+  {
+   "network": "mainnet",
+   "input": "bob.alice.k",
+   "ownerType": 0,
+   "parent": "alice",
+   "label": "bob",
+   "records": {
+    "sub:bob": {
+     "opaque": "5821004f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa00"
+    }
+   },
+   "fault": "bad-length"
+  }
+ ]
+}

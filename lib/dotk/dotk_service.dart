@@ -5,6 +5,7 @@ import 'package:retry/retry.dart';
 import '../kaspa/api/json_client.dart';
 import '../kaspa/utils.dart';
 import 'dotk_names.dart';
+import 'dotk_record_edits.dart';
 import 'dotk_records.dart';
 import 'dotk_types.dart';
 
@@ -39,8 +40,38 @@ class DotkService {
 
   bool get isEnabled => _client is! VoidJsonClient;
 
-  /// The indexer's answer for [target], or null when it names nobody to pay
-  Future<DotkNameClaim?> claimName(String target) async {
+  /// A cache in front of the indexer must not answer a read that proves what
+  /// the indexer has seen
+  static const _fresh = {'Cache-Control': 'no-cache'};
+
+  /// The DAA score of the last block the indexer has read, and the registry
+  /// it reads. A 503 still carries both while the indexer is only behind, but
+  /// an indexer that failed its self-test is not answering.
+  Future<({BigInt? daaScore, String? registryCovenantId})> indexed() async {
+    const path = '/health';
+    final json = _object(
+      await _client
+          .get(path, headers: _fresh, accept: const {503})
+          .timeout(timeout),
+      path,
+    );
+    if (json['selfTest'] case {'proven': false}) {
+      throw Exception('The indexer failed its self-test');
+    }
+    final daaScore = switch (json['lastBlock']) {
+      {'daaScore': final int daaScore} => BigInt.from(daaScore),
+      _ => null,
+    };
+    final registry = json['registryCovenantId'];
+    return (
+      daaScore: daaScore,
+      registryCovenantId: registry is String ? registry : null,
+    );
+  }
+
+  /// The indexer's answer for [target], or null when it names nobody to pay.
+  /// [fresh] asks past any cache.
+  Future<DotkNameClaim?> claimName(String target, {bool fresh = false}) async {
     final (parent, label) = DotkName.splitTarget(target);
     // The parent becomes a path segment below, so the charset rule holds here
     // whatever the caller already checked
@@ -55,7 +86,9 @@ class DotkService {
     final path = '/names/$parent';
     final Object? result;
     try {
-      result = await _client.get(path).timeout(timeout);
+      result = await _client
+          .get(path, headers: fresh ? _fresh : const {})
+          .timeout(timeout);
     } on ApiException catch (e) {
       if (e.statusCode == 404 || e.statusCode == 400) {
         return null;
@@ -105,9 +138,53 @@ class DotkService {
 
     names.sort(DotkName.displayOrder);
 
+    final (cards, primaryHints) = _cards(json['cards'], path);
+
     return DotkAddressClaim(
       names: names,
-      primaryCards: _primaryCards(json['cards'], path),
+      cards: cards,
+      primaryHints: primaryHints,
+      registryCovenantId: _registryCovenantId(json, path),
+    );
+  }
+
+  /// Whether [name] is free, and the gap that covers its key if it is. Null
+  /// for a name the registry cannot hold
+  Future<DotkKeyInfo?> keyInfo(String name) async {
+    if (!DotkName.isValid(name)) {
+      return null;
+    }
+    final path = '/names/$name/key';
+    final Object? result;
+    try {
+      result = await _client.get(path).timeout(timeout);
+    } on ApiException catch (e) {
+      if (e.statusCode == 400) {
+        return null;
+      }
+      rethrow;
+    }
+
+    final json = _object(result, path);
+    final kind = json['kind'];
+    if (kind is! String) {
+      throw FormatException('Unexpected kind for $path: $kind');
+    }
+    if (kind != 'free') {
+      return DotkKeyInfo(
+        free: false,
+        registryCovenantId: _registryCovenantId(json, path),
+      );
+    }
+    final covering = json['covering'];
+    if (covering is! Map<String, Object?>) {
+      throw FormatException('Unexpected covering gap for $path: $covering');
+    }
+
+    return DotkKeyInfo(
+      free: true,
+      gapLo: _bytes(covering['lo'], path, length: 32),
+      gapHi: _bytes(covering['hi'], path, length: 32),
       registryCovenantId: _registryCovenantId(json, path),
     );
   }
@@ -137,34 +214,41 @@ class DotkService {
     return names;
   }
 
-  Map<String, DotkCard> _primaryCards(Object? value, String path) {
+  /// The live cards of an address and the names the indexer read as setting
+  /// primary. A malformed card is dropped on its own, so its name shows
+  /// without records and the address's other names still show
+  (Map<String, DotkCard>, Set<String>) _cards(Object? value, String path) {
     if (value == null) {
-      return const {};
+      return (const {}, const {});
     }
     if (value is! List) {
       throw FormatException('Unexpected cards for $path: $value');
     }
 
-    final primaryCards = <String, DotkCard>{};
+    final cards = <String, DotkCard>{};
+    final primaryHints = <String>{};
     for (final card in value) {
       if (card is! Map<String, Object?>) {
-        throw FormatException('Unexpected card for $path: $card');
-      }
-      final records = card['records'];
-      if (records is! Map<String, Object?>?) {
-        throw FormatException('Unexpected records for $path: $records');
-      }
-      if (records?['primary'] != true) {
         continue;
       }
+      final records = card['records'];
       final name = card['name'];
-      if (name is! String) {
-        throw FormatException('Unexpected card name for $path: $name');
+      if (records is! Map<String, Object?>? || name is! String) {
+        continue;
       }
-      primaryCards[name] = _card(card, path)!;
+      final DotkCard parsed;
+      try {
+        parsed = _card(card, path)!;
+      } on FormatException {
+        continue;
+      }
+      cards[name] = parsed;
+      if (records?[DotkRecordEdits.primaryKey] == true) {
+        primaryHints.add(name);
+      }
     }
 
-    return primaryCards;
+    return (cards, primaryHints);
   }
 
   DotkCard? _card(Object? value, String path) {

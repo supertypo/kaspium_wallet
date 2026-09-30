@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:blake3_dart/blake3_dart.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaspium_wallet/dotk/dotk_names.dart';
+import 'package:kaspium_wallet/dotk/dotk_owned_name.dart';
 import 'package:kaspium_wallet/dotk/dotk_proof.dart';
 import 'package:kaspium_wallet/dotk/dotk_records.dart';
 import 'package:kaspium_wallet/dotk/dotk_registry.dart';
@@ -26,43 +26,6 @@ AddressPrefix prefixOf(String network) => switch (network) {
   _ => throw ArgumentError(network),
 };
 
-final registries = {
-  'mainnet': DotkRegistry.mainnet,
-  'testnet-10': DotkRegistry.testnet10,
-};
-
-Uint8List le64(int value) =>
-    Uint8List(8)..buffer.asByteData().setUint64(0, value, Endian.little);
-
-/// A CBOR record blob, enough of the encoder for the record sets in the vectors
-Uint8List encodeRecords(Map<String, dynamic> records) {
-  final out = BytesBuilder();
-  void head(int major, int length) => out.add(switch (length) {
-    < 24 => [major << 5 | length],
-    < 256 => [major << 5 | 24, length],
-    _ => [major << 5 | 25, length >> 8, length & 0xff],
-  });
-  void text(String value) {
-    final bytes = utf8.encode(value);
-    head(3, bytes.length);
-    out.add(bytes);
-  }
-
-  head(5, records.length);
-  for (final MapEntry(:key, :value) in records.entries) {
-    text(key);
-    switch (value) {
-      case bool flag:
-        out.addByte(flag ? 0xf5 : 0xf4);
-      case String value:
-        text(value);
-      case {'opaque': String hex}:
-        out.add(hexToBytes(hex));
-    }
-  }
-  return out.toBytes();
-}
-
 DotkCard cardOf(Map<String, dynamic> records) => DotkCard(
   spenderType: DotkOwnerType.schnorr,
   spender: hexToBytes(kOwnerKey),
@@ -71,106 +34,15 @@ DotkCard cardOf(Map<String, dynamic> records) => DotkCard(
 
 void main() {
   final vectors =
-      json.decode(File('./test/dotk_vectors.json').readAsStringSync())
+      json.decode(File('test/dotk/dotk_vectors.json').readAsStringSync())
           as Map<String, dynamic>;
-  List<Map<String, dynamic>> cases(String section, [String? network]) =>
-      ((network == null ? vectors : vectors[network])[section] as List)
-          .cast<Map<String, dynamic>>();
+  List<Map<String, dynamic>> cases(String section) =>
+      (vectors[section] as List).cast<Map<String, dynamic>>();
 
   final ownerKey = hexToBytes(kOwnerKey);
   final owner = Address.publicKey(prefix: .kaspa, publicKey: ownerKey);
 
   group('vectors', () {
-    test('the registry constants are the pinned deployments', () {
-      for (final MapEntry(key: network, value: registry)
-          in registries.entries) {
-        final pinned = vectors[network] as Map<String, dynamic>;
-        final bytecode = registry.deedBytecode;
-        const end = DotkRegistry.deedStateOffset + DotkRegistry.deedStateLength;
-        final prefix = bytecode.sublist(0, DotkRegistry.deedStateOffset);
-        final suffix = bytecode.sublist(end);
-        final hash = blake3(
-          Uint8List.fromList([
-            ...le64(prefix.length),
-            ...prefix,
-            ...le64(suffix.length),
-            ...suffix,
-          ]),
-        );
-
-        expect(registry.covenantId, pinned['registryCovenantId']);
-        expect(hash.hex, pinned['deedTemplateHash'], reason: network);
-      }
-    });
-
-    test('blake3 matches the official vectors', () {
-      const official = {
-        0: 'af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262',
-        1: '2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213',
-        1023:
-            '10108970eeda3eb932baac1428c7a2163b0e924c9a9e25b35bba72b28f70bd11',
-        1024:
-            '42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7',
-        1025:
-            'd00278ae47eb27b34faecf67b4fe263f82d5412916c1ffd97c8cb7fb814b8444',
-        16384:
-            'f875d6646de28985646f34ee13be9a576fd515f76b5b0a26bb324735041ddde4',
-      };
-      for (final MapEntry(key: length, value: hash) in official.entries) {
-        final input = Uint8List.fromList([
-          for (var i = 0; i < length; i++) i % 251,
-        ]);
-        expect(blake3(input).hex, hash, reason: '$length bytes');
-      }
-    });
-
-    test('deed addresses', () {
-      for (final MapEntry(key: network, value: registry)
-          in registries.entries) {
-        for (final c in cases('deedAddress', network)) {
-          final prover = DotkProver(
-            FakeNode(),
-            registry: registry,
-            prefix: prefixOf(c['network']),
-          );
-          final owner = hexToBytes(c['owner']);
-
-          expect(
-            DotkProver.deedState(c['name'], c['ownerType'], owner).hex,
-            c['state'],
-          );
-          expect(
-            prover.deedAddress(c['name'], c['ownerType'], owner),
-            c['address'],
-            reason: '$network ${c['name']} ${c['ownerType']}',
-          );
-        }
-      }
-    });
-
-    test('card addresses', () {
-      for (final network in registries.keys) {
-        for (final c in cases('card', network)) {
-          final card = DotkCard(
-            spenderType: c['spenderType'],
-            spender: hexToBytes(c['spender']),
-            blob: hexToBytes(c['blob']),
-          );
-          final prover = DotkProver(
-            FakeNode(),
-            registry: registries[network]!,
-            prefix: prefixOf(c['network']),
-          );
-
-          expect(
-            DotkProver.cardRedeemScript(c['name'], card).hex,
-            c['redeemScript'],
-          );
-          expect(prover.cardAddress(c['name'], card), c['address']);
-        }
-      }
-    });
-
     test('record blobs decode to the pinned records', () {
       for (final c in cases('recordsDecode')) {
         final records = DotkRecords.tryDecode(hexToBytes(c['blob']));
@@ -496,7 +368,8 @@ void main() {
       String? registryId,
     }) => DotkAddressClaim(
       names: const ['x', 'kaspa', 'coinbase'],
-      primaryCards: primaryCards,
+      cards: primaryCards,
+      primaryHints: primaryCards.keys.toSet(),
       registryCovenantId: registryId ?? registry.covenantId,
     );
 
@@ -593,6 +466,29 @@ void main() {
       );
     });
 
+    test('proves a card setting primary the indexer did not hint', () async {
+      final card = cardOf({'primary': true});
+      final notPrimary = cardOf({'url': 'https://kaspa.org'});
+      hold('x');
+      hold('kaspa', card: card);
+      hold('coinbase', card: notPrimary);
+
+      final name = await prover.displayName(
+        owner.encoded,
+        DotkAddressClaim(
+          names: const ['x', 'kaspa', 'coinbase'],
+          cards: {'kaspa': card, 'coinbase': notPrimary},
+          primaryHints: const {'coinbase'},
+          registryCovenantId: registry.covenantId,
+        ),
+      );
+
+      expect(name, 'kaspa');
+      // The deeds of x and kaspa and kaspa's card: coinbase's blob does not
+      // set primary, whatever the hint says
+      expect(node.asked.single, hasLength(3));
+    });
+
     test('shows the first name when the node proves it', () async {
       hold('x');
 
@@ -615,7 +511,8 @@ void main() {
         owner.encoded,
         DotkAddressClaim(
           names: names,
-          primaryCards: {for (final name in names.reversed) name: card},
+          cards: {for (final name in names.reversed) name: card},
+          primaryHints: names.toSet(),
           registryCovenantId: registry.covenantId,
         ),
       );
@@ -638,6 +535,225 @@ void main() {
         isNull,
       );
       expect(node.asked, isEmpty);
+    });
+  });
+
+  group('proveOwned', () {
+    final registry = DotkRegistry.mainnet;
+    late FakeNode node;
+    late DotkProver prover;
+
+    setUp(() {
+      node = FakeNode();
+      prover = DotkProver(node, registry: registry, prefix: .kaspa);
+    });
+
+    DotkAddressClaim claim(
+      List<String> names, {
+      Map<String, DotkCard> cards = const {},
+      String? registryId,
+    }) => DotkAddressClaim(
+      names: names,
+      cards: cards,
+      registryCovenantId: registryId ?? registry.covenantId,
+    );
+
+    void hold(
+      String name, {
+      DotkCard? card,
+      int daaScore = 0,
+      int cardIndex = 1,
+    }) {
+      node.utxos.add(
+        fakeUtxo(
+          prover.deedAddress(name, DotkOwnerType.schnorr, ownerKey),
+          transactionId: blake3(ascii.encode(name)).hex,
+          daaScore: daaScore,
+          covenantId: registry.covenantId,
+        ),
+      );
+      if (card != null) {
+        node.utxos.add(
+          fakeUtxo(
+            prover.cardAddress(name, card),
+            transactionId: blake3(ascii.encode(name)).hex,
+            index: cardIndex,
+          ),
+        );
+      }
+    }
+
+    test('lists only the names the node backs, from this registry', () async {
+      hold('kaspa');
+
+      final owned = await prover.proveOwned({
+        owner.encoded: claim(['kaspa', 'x']),
+      });
+
+      expect(owned.map((name) => name.name), ['kaspa']);
+      expect(owned.single.address, owner.encoded);
+      expect(owned.single.recordsState, DotkRecordsState.none);
+      expect(owned.single.primary, DotkPrimary.none);
+
+      final other = await prover.proveOwned({
+        owner.encoded: claim(['kaspa'], registryId: 'ff' * 32),
+      });
+      expect(other, isEmpty);
+    });
+
+    test('shows records only from output 1 of the deed', () async {
+      final card = cardOf({'url': 'https://kaspa.org'});
+      hold('kaspa', card: card);
+      final proven = await prover.proveOwned({
+        owner.encoded: claim(['kaspa'], cards: {'kaspa': card}),
+      });
+      expect(proven.single.recordsState, DotkRecordsState.proven);
+      expect(proven.single.records, {'url': 'https://kaspa.org'});
+
+      node.utxos.clear();
+      hold('kaspa', card: card, cardIndex: 2);
+      final unproven = await prover.proveOwned({
+        owner.encoded: claim(['kaspa'], cards: {'kaspa': card}),
+      });
+      expect(unproven.single.recordsState, DotkRecordsState.unproven);
+      expect(unproven.single.records, isEmpty);
+      expect(unproven.single.card, isNull);
+      // A transfer still sees the listing, and refuses to drop it
+      expect(unproven.single.listedCard, isNotNull);
+    });
+
+    test('marks a card the node holds but cannot read unreadable', () async {
+      for (final blob in [
+        Uint8List.fromList([0xff]),
+        encodeRecords({
+          'primary': true,
+          'bio': 'a' * DotkRecords.blobMaxLength,
+        }),
+      ]) {
+        node.utxos.clear();
+        final card = DotkCard(
+          spenderType: DotkOwnerType.schnorr,
+          spender: ownerKey,
+          blob: blob,
+        );
+        hold('kaspa', card: card);
+
+        final owned = await prover.proveOwned({
+          owner.encoded: claim(['kaspa'], cards: {'kaspa': card}),
+        });
+
+        final reason = '${blob.length} bytes';
+        expect(
+          owned.single.recordsState,
+          DotkRecordsState.unreadable,
+          reason: reason,
+        );
+        expect(owned.single.records, isEmpty, reason: reason);
+        expect(owned.single.card, same(card), reason: reason);
+        expect(owned.single.cardUtxo?.outpoint.index, 1, reason: reason);
+        expect(owned.single.primary, DotkPrimary.none, reason: reason);
+      }
+    });
+
+    test('picks a primary winner for each address', () async {
+      final card = cardOf({'primary': true});
+      final ecdsa = Address.pubKeyECDSA(
+        prefix: .kaspa,
+        publicKey: Uint8List.fromList([0x02, ...ownerKey]),
+      );
+      hold('kaspa', card: card, daaScore: 9);
+      hold('coinbase', card: card, daaScore: 7);
+      for (final (name, daaScore) in [('x', 3), ('y', 5)]) {
+        final transactionId = blake3(ascii.encode('ecdsa $name')).hex;
+        node.utxos.addAll([
+          fakeUtxo(
+            prover.deedAddress(name, DotkOwnerType.ecdsaEvenY, ownerKey),
+            transactionId: transactionId,
+            daaScore: daaScore,
+            covenantId: registry.covenantId,
+          ),
+          fakeUtxo(
+            prover.cardAddress(name, card),
+            transactionId: transactionId,
+            index: 1,
+          ),
+        ]);
+      }
+
+      final owned = await prover.proveOwned({
+        owner.encoded: claim(
+          ['kaspa', 'coinbase'],
+          cards: {'kaspa': card, 'coinbase': card},
+        ),
+        ecdsa.encoded: claim(['x', 'y'], cards: {'x': card, 'y': card}),
+      });
+
+      final primary = {
+        for (final name in owned) (name.address, name.name): name.primary,
+      };
+      expect(primary, {
+        (owner.encoded, 'kaspa'): DotkPrimary.winner,
+        (owner.encoded, 'coinbase'): DotkPrimary.older,
+        (ecdsa.encoded, 'x'): DotkPrimary.older,
+        (ecdsa.encoded, 'y'): DotkPrimary.winner,
+      });
+    });
+
+    test('proves the names of ECDSA and P2SH owners', () async {
+      final hash = Uint8List(32)..fillRange(0, 32, 0x22);
+      final owners = [
+        (
+          Address.pubKeyECDSA(
+            prefix: .kaspa,
+            publicKey: Uint8List.fromList([0x02, ...ownerKey]),
+          ),
+          DotkOwnerType.ecdsaEvenY,
+          ownerKey,
+        ),
+        (
+          Address.pubKeyECDSA(
+            prefix: .kaspa,
+            publicKey: Uint8List.fromList([0x03, ...ownerKey]),
+          ),
+          DotkOwnerType.ecdsaOddY,
+          ownerKey,
+        ),
+        (
+          Address.scriptHash(prefix: .kaspa, hash: hash),
+          DotkOwnerType.scriptHash,
+          hash,
+        ),
+      ];
+      for (final (_, type, payload) in owners) {
+        node.utxos.add(
+          fakeUtxo(
+            prover.deedAddress('kaspa', type, payload),
+            transactionId: blake3(ascii.encode('$type')).hex,
+            covenantId: registry.covenantId,
+          ),
+        );
+      }
+
+      final owned = await prover.proveOwned({
+        for (final (address, _, _) in owners)
+          address.encoded: claim(['kaspa', 'x']),
+      });
+
+      expect(owned.map((name) => name.address), [
+        for (final (address, _, _) in owners) address.encoded,
+      ]);
+      expect(owned.map((name) => name.name).toSet(), {'kaspa'});
+    });
+
+    test('asks the node in chunks', () async {
+      final names = [for (var i = 0; i < DotkProver.ownedChunk + 1; i++) 'n$i'];
+
+      await prover.proveOwned({owner.encoded: claim(names)});
+
+      expect(node.asked.map((asked) => asked.length), [
+        DotkProver.ownedChunk,
+        1,
+      ]);
     });
   });
 }

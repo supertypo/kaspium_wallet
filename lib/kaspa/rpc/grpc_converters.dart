@@ -205,6 +205,7 @@ RpcUtxoEntry encodeUtxoEntry(UtxoEntry utxoEntry) => RpcUtxoEntry(
   scriptPublicKey: encodeScriptPublicKey(utxoEntry.scriptPublicKey),
   blockDaaScore: utxoEntry.blockDaaScore.toInt64(),
   isCoinbase: utxoEntry.isCoinbase,
+  covenantId: utxoEntry.covenantId?.hex,
 );
 
 Utxo decodeUtxo(RpcUtxosByAddressesEntry rpc) => Utxo(
@@ -245,6 +246,7 @@ RpcTransactionInput encodeTxInput(RawInput input) {
     signatureScript: bytesToHex(input.signatureScript),
     sequence: input.sequence.toInt64(),
     sigOpCount: input.sigOpCount,
+    computeBudget: input.computeBudget,
   );
 }
 
@@ -252,6 +254,13 @@ RpcTransactionOutput encodeTxOutput(RawOutput output) {
   return RpcTransactionOutput(
     amount: output.value.toInt64(),
     scriptPublicKey: encodeScriptPublicKey(output.scriptPublicKey),
+    covenant: switch (output.covenant) {
+      final covenant? => RpcCovenantBinding(
+        authorizingInput: covenant.authorizingInput,
+        covenantId: covenant.covenantId.hex,
+      ),
+      null => null,
+    },
   );
 }
 

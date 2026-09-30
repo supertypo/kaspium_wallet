@@ -4,6 +4,7 @@ import 'package:oktoast/oktoast.dart';
 
 import '../app_providers.dart';
 import '../app_router.dart';
+import '../dotk/dotk_pending_txs.dart';
 import '../kaspa/kaspa.dart';
 import '../l10n/l10n.dart';
 import '../send_sheet/send_confirm_sheet.dart';
@@ -30,12 +31,18 @@ abstract class UIUtil {
 
     try {
       final walletService = ref.read(walletServiceProvider);
-      final utxoNotifier = ref.read(utxoNotifierProvider);
       final feeRate = ref.read(feeRateProvider);
+      // A .k name transaction and the coins a registration holds are not
+      // the user's to cancel: a replaced activation can lose its deposit
+      final spendable = {
+        for (final utxo in ref.read(spendableUtxosProvider))
+          utxo.outpoint: utxo,
+      };
 
       Utxo? getUtxo() {
+        if (isWalletDotkTx(ref, tx)) return null;
         for (final input in tx.apiTx.inputs) {
-          final utxo = utxoNotifier.utxoForOutpoint(input.previousOutpoint);
+          final utxo = spendable[input.previousOutpoint];
           if (utxo != null) return utxo;
         }
         return null;
@@ -91,8 +98,7 @@ abstract class UIUtil {
     BuildContext context, {
     required WidgetRef ref,
   }) async {
-    final txNotifier = ref.read(txNotifierProvider);
-    final pendingTxs = txNotifier.pendingTxs;
+    final pendingTxs = pendingTxsBesideDotk(ref).others;
 
     bool rbf = false;
     if (pendingTxs.isNotEmpty) {
@@ -143,7 +149,11 @@ abstract class UIUtil {
       return;
     }
 
-    final spendableUtxos = ref.read(spendableUtxosProvider);
+    final pending = pendingTxsBesideDotk(ref);
+    final spendableUtxos = ref
+        .read(spendableUtxosProvider)
+        .where((utxo) => !pending.dotkSpent.contains(utxo.outpoint))
+        .toList();
     final walletService = ref.read(walletServiceProvider);
     final addressNotifier = ref.read(addressNotifierProvider);
     final feeRate = ref.read(feeRateProvider);
@@ -163,8 +173,7 @@ abstract class UIUtil {
 
       Amount? minFee;
       if (rbf) {
-        final txNotifier = ref.read(txNotifierProvider);
-        if (txNotifier.pendingTxs.firstOrNull case final pendingTx?) {
+        if (pending.others.firstOrNull case final pendingTx?) {
           minFee = .raw(pendingTx.fee.raw + .one);
         }
       }

@@ -5,6 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_icons.dart';
 import '../app_providers.dart';
 import '../app_router.dart';
+import '../dotk/dotk_lookup_text.dart';
+import '../dotk/dotk_name_resolver.dart';
+import '../dotk/dotk_names.dart';
+import '../dotk/dotk_proven_name.dart';
+import '../dotk/dotk_types.dart';
 import '../kaspa/kaspa.dart';
 import '../l10n/l10n.dart';
 import '../util/formatters.dart';
@@ -17,6 +22,8 @@ import '../widgets/buttons.dart';
 import '../widgets/dismiss_action_buttons.dart';
 import '../widgets/sheet_widget.dart';
 import 'contact.dart';
+
+const _kContactNameMaxLength = 20;
 
 class ContactAddSheet extends ConsumerStatefulWidget {
   final String? address;
@@ -41,9 +48,25 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
   String _nameValidationText = '';
   String _addressValidationText = '';
 
+  /// Resolves a `.k` name typed in the address field
+  late final DotkNameResolver _nameResolver;
+  DotkLookup? _nameLookup;
+
+  // Whether the validation text is about a .k name. Only such a text goes
+  // away as the user types; any other stays until the next check.
+  bool _nameMessage = false;
+  bool _adding = false;
+
   @override
   void initState() {
     super.initState();
+
+    _nameResolver = DotkNameResolver(
+      service: () => ref.read(dotkServiceProvider),
+      prover: () => ref.read(dotkProverProvider),
+      onLookup: _onNameLookup,
+      log: ref.read(loggerProvider),
+    );
 
     // Add focus listeners
     // On name focus change
@@ -73,6 +96,48 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
           }
         });
       }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameResolver.dispose();
+    _nameFocusNode.dispose();
+    _addressFocusNode.dispose();
+    _nameController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  void _onNameLookup(String name, DotkLookup? lookup) {
+    // The field may have moved on while the lookup was in flight
+    if (!mounted || DotkName.tryNormalize(_addressController.text) != name) {
+      return;
+    }
+    setState(() {
+      _nameLookup = lookup;
+      _nameMessage = true;
+      _addressValidationText = dotkLookupText(lookup, l10nOf(context));
+      final resolution = lookup?.resolution;
+      if (resolution != null && _nameController.text.isEmpty) {
+        final contactName = '@${resolution.name}';
+        _nameController.text = contactName.length <= _kContactNameMaxLength
+            ? contactName
+            : contactName.substring(0, _kContactNameMaxLength);
+      }
+    });
+  }
+
+  void _nameTyped(String text) {
+    _nameResolver.textChanged(text);
+    final isName = _nameResolver.isName(text);
+    if (!isName && !_nameMessage) {
+      return;
+    }
+    setState(() {
+      _nameLookup = null;
+      _nameMessage = isName;
+      _addressValidationText = isName ? l10nOf(context).dotkResolving : '';
     });
   }
 
@@ -108,8 +173,8 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
             keyboardType: .text,
             style: styles.textStyleAppTextFieldSimple,
             inputFormatters: [
-              LengthLimitingTextInputFormatter(20),
-              ContactFormatter()
+              LengthLimitingTextInputFormatter(_kContactNameMaxLength),
+              ContactFormatter(),
             ],
             onSubmitted: (text) {
               final scope = FocusScope.of(context);
@@ -155,8 +220,13 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
               icon: AppIcons.scan,
               onPressed: () async {
                 final scanResult = await UserDataUtil.scanQrCode(context);
+                if (!mounted) return;
                 final data = scanResult?.code;
-                if (data == null) {
+                if (data != null && _nameResolver.isName(data)) {
+                  _addressController.text = data.trim();
+                  _addressFocusNode.unfocus();
+                  _nameTyped(data);
+                } else if (data == null) {
                   UIUtil.showSnackbar(l10n.qrInvalidAddress);
                 } else {
                   final address = Address.tryParse(
@@ -164,9 +234,11 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
                     expectedPrefix: addressPrefix,
                   );
                   if (mounted && address != null) {
+                    _nameResolver.textChanged(address.toString());
                     setState(() {
                       _addressController.text = address.toString();
                       _addressValidationText = "";
+                      _nameLookup = null;
                       _addressValid = true;
                       _addressValidAndUnfocused = true;
                     });
@@ -185,10 +257,13 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
                 }
                 String? data = await UserDataUtil.getClipboardText(.ADDRESS);
                 if (data != null) {
+                  _nameResolver.textChanged(data);
                   setState(() {
                     _addressValid = true;
                     _showPasteButton = false;
                     _addressController.text = data;
+                    _addressValidationText = '';
+                    _nameLookup = null;
                     _addressValidAndUnfocused = true;
                   });
                   _addressFocusNode.unfocus();
@@ -208,9 +283,12 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
                 expectedPrefix: addressPrefix,
               );
               if (address != null) {
+                _nameResolver.textChanged(text);
                 setState(() {
                   _addressValid = true;
                   _showPasteButton = false;
+                  _addressValidationText = '';
+                  _nameLookup = null;
                   _addressController.text = address.toString();
                 });
                 _addressFocusNode.unfocus();
@@ -219,6 +297,7 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
                   _showPasteButton = true;
                   _addressValid = false;
                 });
+                _nameTyped(text);
               }
             },
             overrideTextFieldWidget: !_shouldShowTextField()
@@ -245,17 +324,27 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
           ),
           // Enter Address Error Container
           Container(
-            margin: const .only(top: 5, bottom: 5),
-            child: Text(
-              _addressValidationText,
-              style: styles.textStyleParagraphThinPrimary,
-            ),
+            margin: const .only(top: 5, bottom: 5, left: 30, right: 30),
+            child: _nameLookup?.resolution != null
+                ? DotkProvenName(
+                    _addressValidationText,
+                    style: styles.textStyleParagraphThinPrimary,
+                  )
+                : Text(
+                    _addressValidationText,
+                    textAlign: .center,
+                    style: styles.textStyleParagraphThinPrimary,
+                  ),
           ),
         ],
       ),
       bottomWidget: ActionButtonsWrapper(
         buttons: [
-          PrimaryButton(title: l10n.addContact, onPressed: _addContact),
+          PrimaryButton(
+            title: l10n.addContact,
+            disabled: _adding,
+            onPressed: _addContact,
+          ),
           const CancelActionButton(),
         ],
       ),
@@ -263,14 +352,23 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
   }
 
   Future<void> _addContact() async {
+    if (_adding) return;
+    // A .k name resolves again first, which can take a moment
+    final resolving = _nameResolver.isName(_addressController.text);
+    if (resolving) setState(() => _adding = true);
     final isValid = await _validateForm();
-    if (!isValid) {
+    if (resolving && mounted) setState(() => _adding = false);
+    if (!isValid || !mounted) {
       return;
     }
     final newContact = Contact(
       name: _nameController.text,
       address:
-          widget.address == null ? _addressController.text : widget.address!,
+          widget.address ??
+          (_nameResolver.isName(_addressController.text)
+              ? _nameLookup?.resolution?.address
+              : null) ??
+          _addressController.text,
     );
     final contacts = ref.read(contactsProvider);
     await contacts.addContact(newContact);
@@ -288,16 +386,44 @@ class _ContactAddSheetState extends ConsumerState<ContactAddSheet> {
     // Address Validations
     // Don't validate address if it came pre-filled in
     if (widget.address == null) {
-      if (_addressController.text.isEmpty) {
+      final text = _addressController.text;
+      if (text.isEmpty) {
         isValid = false;
         setState(() {
+          _nameMessage = false;
           _addressValidationText = l10n.addressMising;
         });
-      } else if (Address.tryParse(_addressController.text,
-              expectedPrefix: prefix) ==
-          null) {
+      } else if (_nameResolver.isName(text)) {
+        // Resolve again: the name may have moved since the field's lookup
+        final lookup = await _nameResolver.resolveForSend(
+          text,
+          current: () => _addressController.text,
+        );
+        final address = lookup?.resolution?.address;
+        if (!mounted) return false;
+        if (address == null) {
+          isValid = false;
+          setState(() {
+            _nameLookup = lookup;
+            _nameMessage = true;
+            _addressValidationText = lookup == null
+                ? l10n.dotkLookupFailed
+                : dotkLookupError(lookup.status, l10n);
+          });
+        } else if (ref
+            .read(contactsProvider)
+            .contactExistsWithAddress(address)) {
+          isValid = false;
+          // An error, so not drawn as the proven name it came from
+          setState(() {
+            _nameLookup = null;
+            _addressValidationText = l10n.contactExists;
+          });
+        }
+      } else if (Address.tryParse(text, expectedPrefix: prefix) == null) {
         isValid = false;
         setState(() {
+          _nameMessage = false;
           _addressValidationText = l10n.invalidAddress;
         });
       } else {

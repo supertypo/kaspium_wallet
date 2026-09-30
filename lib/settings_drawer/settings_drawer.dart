@@ -12,6 +12,7 @@ import '../widgets/item_divider.dart';
 import 'accounts_area.dart';
 import 'contact_support_settings_item.dart';
 import 'currency_settings_item.dart';
+import 'dotk_names_settings_item.dart';
 import 'language_settings_item.dart';
 import 'logout_settings_item.dart';
 import 'network_menu.dart';
@@ -193,6 +194,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet>
         );
 
         final pushAvailable = ref.watch(pushAvailableProvider);
+        final dotkNamesAvailable = ref.watch(dotkNamesAvailableProvider);
         //final canBuy = ref.watch(networkProvider) == .mainnet;
 
         final items = <Widget>[
@@ -238,6 +240,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet>
               _contactsController.forward();
             },
           ),
+          if (dotkNamesAvailable) const DotkNamesSettingsItem(),
           SingleLineItem(
             heading: l10n.advancedHeader,
             settingIcon: Icons.settings_applications,

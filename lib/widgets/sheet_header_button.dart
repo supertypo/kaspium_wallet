@@ -8,17 +8,26 @@ class SheetHeaderButton extends ConsumerWidget {
   final bool visible;
   final VoidCallback? onPressed;
 
+  /// Names the button for screen readers and on a long press
+  final String? tooltip;
+
   const SheetHeaderButton({
     super.key,
     required this.icon,
     this.visible = true,
     required this.onPressed,
+    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(themeProvider);
     final styles = ref.watch(stylesProvider);
+    final button = TextButton(
+      style: styles.sheetHeaderButtonStyle,
+      onPressed: onPressed,
+      child: Icon(icon, size: 24, color: theme.text),
+    );
 
     return SizedBox(
       width: 50,
@@ -28,11 +37,10 @@ class SheetHeaderButton extends ConsumerWidget {
         maintainSize: true,
         maintainAnimation: true,
         maintainState: true,
-        child: TextButton(
-          style: styles.sheetHeaderButtonStyle,
-          onPressed: onPressed,
-          child: Icon(icon, size: 24, color: theme.text),
-        ),
+        child: switch (tooltip) {
+          final tooltip? => Tooltip(message: tooltip, child: button),
+          null => button,
+        },
       ),
     );
   }

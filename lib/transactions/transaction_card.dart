@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../app_icons.dart';
 import '../app_providers.dart';
 import '../app_styles.dart';
+import '../dotk/dotk_names.dart';
 import '../kaspa/kaspa.dart';
 import '../l10n/l10n.dart';
 import '../util/numberutil.dart';
@@ -186,7 +187,7 @@ class TransactionCard extends ConsumerWidget {
                             ] else if (dotkName != null) ...[
                               Flexible(
                                 child: Text(
-                                  dotkName,
+                                  DotkName.isolated(dotkName),
                                   style: styles.textStyleTransactionAmountSmall,
                                   maxLines: 1,
                                   overflow: .ellipsis,

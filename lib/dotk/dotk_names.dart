@@ -83,6 +83,11 @@ class DotkName {
 
   static String display(String target) => '$target$suffix';
 
+  /// [text] isolated from a right-to-left paragraph, where a name that
+  /// starts with digits would otherwise read backwards. A name reads left to
+  /// right by its letters, and a translated sentence keeps its direction.
+  static String isolated(String text) => '\u2068$text\u2069';
+
   static int displayOrder(String a, String b) {
     final byLength = a.length.compareTo(b.length);
 
